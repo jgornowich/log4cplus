@@ -66,7 +66,8 @@ namespace log4cplus {
          *   tokenize(s, '.', back_insert_iterator<list<string> >(tokens));
          * </pre>
          */
-        template <class StringType, class OutputIter>
+        template <typename StringType, typename OutputIter>
+            requires std::output_iterator<OutputIter, StringType>
         inline
         void
         tokenize(const StringType& s, typename StringType::value_type c,
@@ -95,11 +96,11 @@ namespace log4cplus {
         }
 
 
-        template <typename intType, typename stringType, bool isSigned>
+        template <std::integral intType, typename stringType, bool isSigned>
         struct ConvertIntegerToStringHelper;
 
 
-        template <typename intType, typename charType>
+        template <std::integral intType, typename charType>
         struct ConvertIntegerToStringHelper<intType, charType, true>
         {
             static inline
@@ -111,10 +112,9 @@ namespace log4cplus {
                 // positive counterpart instead.  Also, in twos
                 // complement arithmetic the smallest negative number
                 // does not have positive counterpart; the range is
-                // asymetric.  That's why we handle the case of value
+                // asymmetric.  That's why we handle the case of value
                 // == min() specially here.
-                if (LOG4CPLUS_UNLIKELY (
-                    value == (std::numeric_limits<intType>::min) ()))
+                if (value == (std::numeric_limits<intType>::min) ()) [[unlikely]]
                 {
                     intType const r = value / 10;
                     intType const a = (-r) * 10;
@@ -129,7 +129,7 @@ namespace log4cplus {
                     value = -value;
             }
 
-            static
+            static constexpr
             bool
             is_negative (intType val)
             {
@@ -138,7 +138,7 @@ namespace log4cplus {
         };
 
 
-        template <typename intType, typename charType>
+        template <std::integral intType, typename charType>
         struct ConvertIntegerToStringHelper<intType, charType, false>
         {
             static inline
@@ -148,7 +148,7 @@ namespace log4cplus {
                 // This will never be called for unsigned types.
             }
 
-            static
+            static constexpr
             bool
             is_negative (intType)
             {
@@ -157,7 +157,7 @@ namespace log4cplus {
         };
 
 
-        template <class stringType, class intType>
+        template <class stringType, std::integral intType>
         inline
         void
         convertIntegerToString (stringType & str, intType value)
@@ -174,7 +174,7 @@ namespace log4cplus {
             charType * it = &buffer[buffer_size];
             charType const * const buf_end = &buffer[buffer_size];
 
-            if (LOG4CPLUS_UNLIKELY (value == 0))
+            if (value == 0) [[unlikely]]
             {
                 --it;
                 *it = LOG4CPLUS_TEXT('0');
@@ -204,7 +204,7 @@ namespace log4cplus {
         }
 
 
-        template<class intType>
+        template<std::integral intType>
         inline
         tstring
         convertIntegerToString (intType value)
@@ -215,7 +215,7 @@ namespace log4cplus {
         }
 
 
-        template<class intType>
+        template<std::integral intType>
         inline
         std::string
         convertIntegerToNarrowString (intType value)
@@ -228,6 +228,7 @@ namespace log4cplus {
 
         //! Join a list of items into a string.
         template <typename Iterator, typename Separator>
+            requires std::forward_iterator<Iterator>
         inline
         void
         join_worker (tstring & result, Iterator & start, Iterator & last,
@@ -245,6 +246,7 @@ namespace log4cplus {
 
         //! Join a list of items into a string.
         template <typename Iterator>
+            requires std::forward_iterator<Iterator>
         inline
         void
         join (tstring & result, Iterator start, Iterator last,
@@ -255,6 +257,7 @@ namespace log4cplus {
 
         //! Join a list of items into a string.
         template <typename Iterator>
+            requires std::forward_iterator<Iterator>
         inline
         void
         join (tstring & result, Iterator start, Iterator last,

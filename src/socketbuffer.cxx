@@ -20,6 +20,7 @@
 
 #include <cstring>
 #include <limits>
+#include <utility>
 #include <log4cplus/helpers/socketbuffer.h>
 #include <log4cplus/helpers/loglog.h>
 
@@ -38,11 +39,11 @@
 #endif
 
 #if defined (LOG4CPLUS_WITH_UNIT_TESTS)
-#include <catch.hpp>
+#include <catch_amalgamated.hpp>
 #endif
 
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -80,7 +81,7 @@ SocketBuffer::readByte()
         return 0;
     }
 
-    unsigned char ret = static_cast<unsigned char>(buffer[pos]);
+    auto ret = static_cast<unsigned char>(buffer[pos]);
     pos += sizeof(unsigned char);
 
     return ret;
@@ -200,6 +201,7 @@ SocketBuffer::appendByte(unsigned char val)
             LOG4CPLUS_TEXT("SocketBuffer::appendByte()-")
             LOG4CPLUS_TEXT(" Attempt to write beyond end of buffer"),
             true);
+        std::unreachable ();
     }
 
     buffer[pos] = static_cast<char>(val);
@@ -217,6 +219,7 @@ SocketBuffer::appendShort(unsigned short val)
             LOG4CPLUS_TEXT("SocketBuffer::appendShort()-")
             LOG4CPLUS_TEXT("Attempt to write beyond end of buffer"),
             true);
+        std::unreachable ();
     }
 
     unsigned short s = htons(val);
@@ -235,7 +238,7 @@ SocketBuffer::appendInt(unsigned int val)
             LOG4CPLUS_TEXT("SocketBuffer::appendInt()-")
             LOG4CPLUS_TEXT(" Attempt to write beyond end of buffer"),
             true);
-        return;
+        std::unreachable ();
     }
 
     int i = htonl(val);
@@ -258,7 +261,7 @@ SocketBuffer::appendString(const tstring& str)
             LOG4CPLUS_TEXT("SocketBuffer::appendString()-")
             LOG4CPLUS_TEXT(" Attempt to write beyond end of buffer"),
             true);
-        return;
+        std::unreachable ();
     }
 
     appendInt(static_cast<unsigned>(strlen));
@@ -283,7 +286,7 @@ SocketBuffer::appendBuffer(const SocketBuffer& buf)
             LOG4CPLUS_TEXT("SocketBuffer::appendBuffer()-")
             LOG4CPLUS_TEXT(" Attempt to write beyond end of buffer"),
             true);
-        return;
+        std::unreachable ();
     }
 
     std::memcpy(&buffer[pos], buf.buffer, buf.getSize());
@@ -325,4 +328,4 @@ CATCH_TEST_CASE ("SocketBuffer", "[sockets]")
 #endif
 
 
-} } // namespace log4cplus { namespace helpers {
+} // namespace log4cplus::helpers

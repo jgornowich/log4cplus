@@ -6,17 +6,17 @@
 //
 //
 //  Copyright (C) 2009-2017, Vaclav Haisman. All rights reserved.
-//  
+//
 //  Redistribution and use in source and binary forms, with or without modifica-
 //  tion, are permitted provided that the following conditions are met:
-//  
+//
 //  1. Redistributions of  source code must  retain the above copyright  notice,
 //     this list of conditions and the following disclaimer.
-//  
+//
 //  2. Redistributions in binary form must reproduce the above copyright notice,
 //     this list of conditions and the following disclaimer in the documentation
 //     and/or other materials provided with the distribution.
-//  
+//
 //  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
 //  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
 //  FITNESS  FOR A PARTICULAR  PURPOSE ARE  DISCLAIMED.  IN NO  EVENT SHALL  THE
@@ -28,9 +28,9 @@
 //  (INCLUDING  NEGLIGENCE OR  OTHERWISE) ARISING IN  ANY WAY OUT OF THE  USE OF
 //  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/** @file 
- * This header contains declaration internal to log4cplus. They must never be
- * visible from user accesible headers or exported in DLL/shared libray.
+/** @file
+ * This header contains declarations internal to log4cplus. They must never be
+ * visible from user accessible headers or exported in a DLL/shared library.
  */
 
 
@@ -74,7 +74,7 @@ struct gft_scratch_pad
 {
     gft_scratch_pad ();
     ~gft_scratch_pad ();
-    
+
     void
     reset ()
     {
@@ -83,7 +83,7 @@ struct gft_scratch_pad
         s_str_valid = false;
         ret.clear ();
     }
-    
+
     log4cplus::tstring q_str;
     log4cplus::tstring uc_q_str;
     log4cplus::tstring s_str;
@@ -118,7 +118,7 @@ struct per_thread_data
     tostringstream macros_oss;
     tostringstream layout_oss;
     DiagnosticContextStack ndc_dcs;
-    MappedDiagnosticContextMap mdc_map;
+    MappedDiagnosticContext mdc;
     log4cplus::tstring thread_name;
     log4cplus::tstring thread_name2;
     gft_scratch_pad gft_sp;
@@ -155,7 +155,7 @@ inline
 per_thread_data *
 get_ptd (bool alloc = true)
 {
-    if (LOG4CPLUS_UNLIKELY (! ptd && alloc))
+    if (! ptd && alloc) [[unlikely]]
         return alloc_ptd ();
 
     // The assert() does not belong here. get_ptd() might be called by
@@ -185,7 +185,7 @@ get_ptd (bool alloc = true)
         = reinterpret_cast<per_thread_data *>(
             thread::impl::tls_get_value (tls_storage_key));
 
-    if (LOG4CPLUS_UNLIKELY (! ptd && alloc))
+    if (! ptd && alloc) [[unlikely]]
         return alloc_ptd ();
 
     return ptd;
@@ -238,7 +238,7 @@ LOG4CPLUS_EXPORT void clear_tostringstream (tostringstream &);
 } // namespace detail
 
 
-} // namespace log4cplus { 
+} // namespace log4cplus {
 
 
 #endif // LOG4CPLUS_INTERNAL_INTERNAL_HEADER_

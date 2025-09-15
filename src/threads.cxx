@@ -21,6 +21,7 @@
 #include <log4cplus/config.hxx>
 
 #include <exception>
+#include <memory>
 #include <ostream>
 #include <cerrno>
 
@@ -68,7 +69,7 @@
 #endif // LOG4CPLUS_SINGLE_THREADED
 
 
-namespace log4cplus { namespace thread {
+namespace log4cplus::thread {
 
 LOG4CPLUS_EXPORT
 void
@@ -87,12 +88,7 @@ LOG4CPLUS_EXPORT
 void
 yield()
 {
-#if defined(LOG4CPLUS_USE_PTHREADS)
-    sched_yield();
-#elif defined(_WIN32)
-    if (! SwitchToThread ())
-        Sleep (0);
-#endif
+    std::this_thread::yield();
 }
 
 #if defined(LOG4CPLUS_SINGLE_THREADED)
@@ -110,7 +106,7 @@ getCurrentThreadName()
 {
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
     log4cplus::tstring & name = log4cplus::internal::get_thread_name_str ();
-    if (LOG4CPLUS_UNLIKELY (name.empty ()))
+    if (name.empty ()) [[unlikely]]
     {
         log4cplus::tostringstream tmp;
         tmp << impl::getCurrentThreadId ();
@@ -118,7 +114,7 @@ getCurrentThreadName()
     }
 #else
     log4cplus::tstring & name = thread_name;
-    if (LOG4CPLUS_UNLIKELY(name.empty()))
+    if (name.empty()) [[unlikely]]
     {
         name = LOG4CPLUS_TEXT("single");
     }
@@ -139,6 +135,11 @@ get_current_thread_name_alt (log4cplus::tostream * s)
     log4cplus::tostream & os = *s;
 
 #if defined (LOG4CPLUS_USE_PTHREADS) && defined (__linux__) \
+    && defined (LOG4CPLUS_HAVE_GETTID_FUNC)
+    pid_t tid = gettid ();
+    os << tid;
+
+#elif defined (LOG4CPLUS_USE_PTHREADS) && defined (__linux__) \
     && defined (LOG4CPLUS_HAVE_GETTID)
     pid_t tid = syscall (SYS_gettid);
     os << tid;
@@ -165,7 +166,7 @@ getCurrentThreadName2()
 {
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
     log4cplus::tstring & name = log4cplus::internal::get_thread_name2_str ();
-    if (LOG4CPLUS_UNLIKELY (name.empty ()))
+    if (name.empty ()) [[unlikely]]
     {
         log4cplus::tostringstream tmp;
         get_current_thread_name_alt (&tmp);
@@ -174,7 +175,7 @@ getCurrentThreadName2()
 
 #else
     log4cplus::tstring & name = thread_name2;
-    if (LOG4CPLUS_UNLIKELY(name.empty()))
+    if (name.empty()) [[unlikely]]
     {
         name = getCurrentThreadName();
     }
@@ -258,8 +259,8 @@ AbstractThread::start()
     try
     {
         flags |= fRUNNING;
-        thread.reset (
-            new std::thread ([this] (AbstractThreadPtr const & thread_ptr) {
+        thread = std::make_unique<std::thread> (
+            [this] (AbstractThreadPtr const & thread_ptr) {
                     (void) thread_ptr;
                     blockAllSignals ();
                     helpers::LogLog & loglog = helpers::getLogLog();
@@ -281,7 +282,7 @@ AbstractThread::start()
                     }
                     this->flags &= ~fRUNNING;
                     threadCleanup ();
-                }, AbstractThreadPtr (this)));
+                }, AbstractThreadPtr (this));
     }
     catch (...)
     {
@@ -312,4 +313,4 @@ AbstractThread::~AbstractThread()
 #endif // LOG4CPLUS_SINGLE_THREADED
 
 
-} } // namespace log4cplus { namespace thread {
+} // namespace log4cplus::thread

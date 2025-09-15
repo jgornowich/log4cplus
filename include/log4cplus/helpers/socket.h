@@ -31,6 +31,7 @@
 #endif
 
 #include <array>
+#include <optional>
 
 #include <log4cplus/tstring.h>
 #include <log4cplus/helpers/socketbuffer.h>
@@ -39,7 +40,7 @@
 namespace log4cplus {
     namespace helpers {
 
-        enum SocketState { ok,
+        enum class SocketState { ok,
                            not_opened,
                            bad_address,
                            connection_failed,
@@ -101,11 +102,13 @@ namespace log4cplus {
                 SocketBuffer const * const * buffers);
 
             template <typename... Args>
+                requires (sizeof... (Args) == 0
+                    || (std::is_same_v<std::remove_cvref_t<Args>, SocketBuffer> && ...))
             static bool write(Socket & socket, Args &&... args)
             {
                 SocketBuffer const * const buffers[sizeof... (args)] {
                     (&args)... };
-                return socket.write (sizeof... (args), buffers);
+                return socket.write (sizeof... (Args), buffers);
             }
         };
 
@@ -154,7 +157,7 @@ namespace log4cplus {
         LOG4CPLUS_EXPORT long write(SOCKET_TYPE sock,
             const std::string & buffer);
 
-        LOG4CPLUS_EXPORT tstring getHostname (bool fqdn);
+        LOG4CPLUS_EXPORT std::optional<tstring> getHostname (bool fqdn);
         LOG4CPLUS_EXPORT int setTCPNoDelay (SOCKET_TYPE, bool);
 
     } // end namespace helpers

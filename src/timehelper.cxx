@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <vector>
 #include <iomanip>
+#include <utility>
 #include <cassert>
 #include <cerrno>
 #if defined (UNICODE)
@@ -56,9 +57,7 @@
 #include <log4cplus/config/windowsh-inc.h>
 
 
-namespace log4cplus { namespace helpers {
-
-const int ONE_SEC_IN_USEC = 1000000;
+namespace log4cplus::helpers {
 
 using std::mktime;
 using std::gmtime;
@@ -74,7 +73,7 @@ Time
 from_struct_tm (tm * t)
 {
     time_t time = helpers::mktime(t);
-    if (LOG4CPLUS_LIKELY (time != -1))
+    if (time != -1) [[likely]]
         return from_time_t (time);
     else
     {
@@ -90,7 +89,7 @@ gmTime (tm* t, Time const & the_time)
     time_t clock = to_time_t (the_time);
 #if defined (LOG4CPLUS_HAVE_GMTIME_S) && defined (_MSC_VER)
     errno_t eno;
-    if (LOG4CPLUS_UNLIKELY ((eno = gmtime_s (t, &clock)) != 0))
+    if ((eno = gmtime_s (t, &clock)) != 0) [[unlikely]]
         throw std::system_error (eno, std::system_category (),
             "gmTime(): gmtime_s() failed");
 #elif defined (LOG4CPLUS_HAVE_GMTIME_S) && defined (__BORLANDC__)
@@ -112,7 +111,7 @@ localTime (tm* t, Time const & the_time)
     ::localtime_r(&clock, t);
 #elif defined (LOG4CPLUS_HAVE_LOCALTIME_S)
     errno_t eno;
-    if (LOG4CPLUS_UNLIKELY ((eno = localtime_s (t, &clock)) != 0))
+    if ((eno = localtime_s (t, &clock)) != 0) [[unlikely]]
         throw std::system_error (eno, std::system_category (),
             "localTime(): localtime_s() failed");
 #else
@@ -200,7 +199,7 @@ getFormattedTime(const log4cplus::tstring& fmt_orig,
     gft_sp.ret.reserve (fmt_orig_size + fmt_orig_size / 3);
     State state = TEXT;
 
-    // Walk the format string and process all occurences of %q, %Q and %s.
+    // Walk the format string and process all occurrences of %q, %Q and %s.
 
     long const tv_usec = microseconds_part (the_time);
     time_t const tv_sec = to_time_t (the_time);
@@ -283,7 +282,7 @@ getFormattedTime(const log4cplus::tstring& fmt_orig,
     // without changing errno.
     std::size_t const buffer_size_max
         = (std::max) (static_cast<std::size_t>(1024), buffer_size * 16);
-    
+
     buffer_size = (std::max) (buffer_size, gft_sp.buffer.capacity());
 
     do
@@ -306,6 +305,7 @@ getFormattedTime(const log4cplus::tstring& fmt_orig,
                 LogLog::getLogLog ()->error (
                     LOG4CPLUS_TEXT("Error in strftime(): ")
                     + convertIntegerToString (eno), true);
+                std::unreachable();
             }
         }
     }
@@ -315,4 +315,4 @@ getFormattedTime(const log4cplus::tstring& fmt_orig,
 }
 
 
-} } // namespace log4cplus { namespace helpers {
+} // namespace log4cplus::helpers

@@ -1,0 +1,66 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - os: 'ubuntu-24.04'
+          cc: 'gcc-14'
+          cxx: 'g++-14'
+          prereq: |
+            sudo apt install libboost-iostreams-dev qt6-base-dev pkgconf
+          configure_flags: '--with-qt6'
+
+        # Enable macOS build by installing Boost via Homebrew
+        - os: 'macos-15'
+          cc: 'clang'
+          cxx: 'clang++'
+          cppflags: '-I$(brew --prefix boost)/include'
+          prereq: |
+            #brew update
+            brew install boost
+            sudo xcode-select -s '/Applications/Xcode_16.4.app/Contents/Developer'
+          configure_flags: ''
+
+        - os: 'macos-15'
+          cc: '$(brew --prefix llvm@18)/bin/clang'
+          cxx: '$(brew --prefix llvm@18)/bin/clang++'
+          cppflags: '-I$(brew --prefix boost)/include'
+          prereq: |
+            brew install boost
+            sudo xcode-select -s '/Applications/Xcode_16.4.app/Contents/Developer'
+          configure_flags: ''
+
+    runs-on: ${{ matrix.config.os }}
+
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        submodules: recursive
+    - name: install prerequisites
+      run: |
+        ${{ matrix.config.prereq }}
+    - name: configure
+      run: |
+        ${{ matrix.config.cxx }} --version
+        ./scripts/fix-timestamps.sh
+        mkdir objdir
+        cd objdir
+        ../configure CPPFLAGS="${{ matrix.config.cppflags }}" \
+          CC="${{ matrix.config.cc }}" \
+          CXX="${{ matrix.config.cxx }}" \
+          ${{ matrix.config.configure_flags }} \
+          --enable-shared --enable-unit-tests --with-working-locale
+        ./config.status --config
+    - name: make
+      run: cd objdir ; make
+    - name: make check
+      run: cd objdir ; make check

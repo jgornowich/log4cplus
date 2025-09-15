@@ -35,13 +35,12 @@ namespace log4cplus
 
 HierarchyLocker::HierarchyLocker(Hierarchy& _h)
 : h(_h),
-  hierarchyLocker(h.hashtable_mutex),
-  loggerList()
+  hierarchyLocker(h.hashtable_mutex)
 {
     // Get a copy of all of the Hierarchy's Loggers (except the Root Logger)
     h.initializeLoggerList(loggerList);
 
-    // Lock all of the Hierarchy's Loggers' mutexs
+    // Lock all of the Hierarchy's Loggers' mutexes
     LoggerList::iterator it;
     try
     {
@@ -53,7 +52,7 @@ HierarchyLocker::HierarchyLocker(Hierarchy& _h)
         helpers::getLogLog().error(
             LOG4CPLUS_TEXT("HierarchyLocker::ctor()")
             LOG4CPLUS_TEXT("- An error occurred while locking"));
-        LoggerList::iterator range_end = it;
+        auto range_end = it;
         for (it = loggerList.begin (); it != range_end; ++it)
             it->value->appender_list_mutex.unlock ();
         throw;

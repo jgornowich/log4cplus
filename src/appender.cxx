@@ -28,7 +28,9 @@
 #include <log4cplus/spi/loggingevent.h>
 #include <log4cplus/internal/internal.h>
 #include <log4cplus/thread/syncprims-pub-impl.h>
+#include <memory>
 #include <stdexcept>
+#include <utility>
 
 
 namespace log4cplus
@@ -39,12 +41,10 @@ namespace log4cplus
 // log4cplus::ErrorHandler dtor
 ///////////////////////////////////////////////////////////////////////////////
 
-ErrorHandler::ErrorHandler ()
-{ }
+ErrorHandler::ErrorHandler () = default;
 
 
-ErrorHandler::~ErrorHandler()
-{ }
+ErrorHandler::~ErrorHandler() = default;
 
 
 
@@ -57,8 +57,7 @@ OnlyOnceErrorHandler::OnlyOnceErrorHandler()
 { }
 
 
-OnlyOnceErrorHandler::~OnlyOnceErrorHandler ()
-{ }
+OnlyOnceErrorHandler::~OnlyOnceErrorHandler () = default;
 
 
 void
@@ -102,7 +101,6 @@ Appender::Appender()
 
 Appender::Appender(const log4cplus::helpers::Properties & properties)
     : layout(new SimpleLayout)
-    , name()
     , threshold(NOT_SET_LOG_LEVEL)
     , errorHandler(new OnlyOnceErrorHandler)
     , useLockFile(false)
@@ -123,6 +121,7 @@ Appender::Appender(const log4cplus::helpers::Properties & properties)
                 LOG4CPLUS_TEXT("Cannot find LayoutFactory: \"")
                 + factoryName
                 + LOG4CPLUS_TEXT("\""), true);
+            std::unreachable();
         }
 
         helpers::Properties layoutProperties =
@@ -133,6 +132,7 @@ Appender::Appender(const log4cplus::helpers::Properties & properties)
                 helpers::getLogLog().error(
                     LOG4CPLUS_TEXT("Failed to create Layout: ")
                     + factoryName, true);
+                std::unreachable();
             }
             else {
                 layout = std::move(newLayout);
@@ -142,6 +142,7 @@ Appender::Appender(const log4cplus::helpers::Properties & properties)
             helpers::getLogLog().error(
                 LOG4CPLUS_TEXT("Error while creating Layout: ")
                 + LOG4CPLUS_C_STR_TO_TSTRING(e.what()), true);
+            std::unreachable();
         }
 
     }
@@ -170,6 +171,7 @@ Appender::Appender(const log4cplus::helpers::Properties & properties)
             helpers::getLogLog().error(
                 LOG4CPLUS_TEXT("Appender::ctor()- Cannot find FilterFactory: ")
                 + factoryName, true);
+            std::unreachable();
         }
         spi::FilterPtr tmpFilter = factory->createObject (
             filterProps.getPropertySubset(filterName + LOG4CPLUS_TEXT(".")));
@@ -178,6 +180,7 @@ Appender::Appender(const log4cplus::helpers::Properties & properties)
             helpers::getLogLog().error(
                 LOG4CPLUS_TEXT("Appender::ctor()- Failed to create filter: ")
                 + filterName, true);
+            std::unreachable();
         }
         addFilter (std::move (tmpFilter));
     }
@@ -192,7 +195,7 @@ Appender::Appender(const log4cplus::helpers::Properties & properties)
         {
             try
             {
-                lockFile.reset (new helpers::LockFile (lockFileName));
+                lockFile = std::make_unique<helpers::LockFile> (lockFileName);
             }
             catch (std::runtime_error const &)
             {
@@ -233,7 +236,8 @@ Appender::~Appender()
 void
 Appender::waitToFinishAsyncLogging()
 {
-#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+#if ! defined (LOG4CPLUS_SINGLE_THREADED) \
+    && defined (LOG4CPLUS_ENABLE_THREAD_POOL)
     if (async)
     {
         // When async flag is true we might have some logging still in flight
@@ -272,6 +276,7 @@ bool Appender::isClosed() const
 void
 Appender::subtract_in_flight ()
 {
+#if defined (LOG4CPLUS_ENABLE_THREAD_POOL)
     std::size_t const prev = std::atomic_fetch_sub_explicit (&in_flight,
         std::size_t (1), std::memory_order_acq_rel);
     if (prev == 1)
@@ -279,6 +284,7 @@ Appender::subtract_in_flight ()
         std::unique_lock<std::mutex> lock (in_flight_mutex);
         in_flight_condition.notify_all ();
     }
+#endif
 }
 
 #endif
@@ -292,7 +298,8 @@ void enqueueAsyncDoAppend (SharedAppenderPtr const & appender,
 void
 Appender::doAppend(const log4cplus::spi::InternalLoggingEvent& event)
 {
-#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+#if ! defined (LOG4CPLUS_SINGLE_THREADED) \
+    && defined (LOG4CPLUS_ENABLE_THREAD_POOL)
     if (async)
     {
         event.gatherThreadSpecificData ();
@@ -319,7 +326,8 @@ Appender::doAppend(const log4cplus::spi::InternalLoggingEvent& event)
 void
 Appender::asyncDoAppend(const log4cplus::spi::InternalLoggingEvent& event)
 {
-#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+#if ! defined (LOG4CPLUS_SINGLE_THREADED) \
+    && defined (LOG4CPLUS_ENABLE_THREAD_POOL)
     struct handle_in_flight
     {
         Appender * const app;
@@ -362,7 +370,7 @@ Appender::syncDoAppend(const log4cplus::spi::InternalLoggingEvent& event)
 
     // Evaluate filters attached to this appender.
 
-    if (checkFilter(filter.get(), event) == spi::DENY)
+    if (checkFilter(filter.get(), event) == spi::FilterResult::DENY)
         return;
 
     // Lock system wide lock.
@@ -423,7 +431,7 @@ Appender::getErrorHandler()
 void
 Appender::setErrorHandler(std::unique_ptr<ErrorHandler> eh)
 {
-    if (! eh.get())
+    if (! eh)
     {
         // We do not throw exception here since the cause is probably a
         // bad config file.

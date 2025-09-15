@@ -3,7 +3,7 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include \
 	-I$(top_srcdir)/threadpool \
 	-I$(top_builddir)/include \
-	-I$(top_srcdir)/catch/single_include/catch2 \
+	-I$(top_srcdir)/catch/extras \
         -DCATCH_CONFIG_PREFIX_ALL=1 \
 	@LOG4CPLUS_NDEBUG@
 AM_CXXFLAGS=@LOG4CPLUS_PROFILING_CXXFLAGS@ @LOG4CPLUS_LTO_CXXFLAGS@
@@ -43,9 +43,17 @@ include %D%/src/Makefile.am
 
 include %D%/simpleserver/Makefile.am
 
+if QT
 include %D%/qt4debugappender/Makefile.am
+endif
 
+if QT5
 include %D%/qt5debugappender/Makefile.am
+endif
+
+if QT6
+include %D%/qt6debugappender/Makefile.am
+endif
 
 include %D%/swig/Makefile.common.am
 include %D%/swig/python/Makefile.am
@@ -91,6 +99,9 @@ include %D%/tests/priority_test/Makefile.am
 endif
 if ENABLE_TESTS
 include %D%/tests/propertyconfig_test/Makefile.am
+endif
+if ENABLE_TESTS
+include %D%/tests/qt6messagehandler_test/Makefile.am
 endif
 if ENABLE_TESTS
 include %D%/tests/socket_test/Makefile.am

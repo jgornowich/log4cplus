@@ -68,17 +68,17 @@ namespace log4cplus
      *   <li>If the remote server is down, the logging requests are
      *   simply dropped. However, if and when the server comes back up,
      *   then event transmission is resumed transparently. This
-     *   transparent reconneciton is performed by a <em>connector</em>
+     *   transparent reconnection is performed by a <em>connector</em>
      *   thread which periodically attempts to connect to the server.
      *
      *   <li>Logging events are automatically <em>buffered</em> by the
-     *   native TCP implementation. This means that if the link to server
+     *   native TCP implementation. This means that if the link to the server
      *   is slow but still faster than the rate of (log) event production
      *   by the client, the client will not be affected by the slow
      *   network connection. However, if the network connection is slower
      *   then the rate of event production, then the client can only
      *   progress at the network rate. In particular, if the network link
-     *   to the the server is down, the client will be blocked.
+     *   to the server is down, the client will be blocked.
      *
      *   <li>On the other hand, if the network link is up, but the server
      *   is down, the client will not be blocked when making log requests
@@ -114,17 +114,20 @@ namespace log4cplus
             const log4cplus::tstring& serverName = tstring(),
             bool ipv6 = false);
         SocketAppender(const log4cplus::helpers::Properties & properties);
+        // Disallow copying of instances of this class
+        SocketAppender(const SocketAppender&) = delete;
+        SocketAppender& operator=(const SocketAppender&) = delete;
 
       // Dtor
         ~SocketAppender();
 
       // Methods
-        virtual void close();
+        virtual void close() override;
 
     protected:
         void openSocket();
         void initConnector ();
-        virtual void append(const spi::InternalLoggingEvent& event);
+        virtual void append(const spi::InternalLoggingEvent& event) override;
 
       // Data
         log4cplus::helpers::Socket socket;
@@ -134,19 +137,14 @@ namespace log4cplus
         bool ipv6 = false;
 
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
-        virtual thread::Mutex const & ctcGetAccessMutex () const;
-        virtual helpers::Socket & ctcGetSocket ();
-        virtual helpers::Socket ctcConnect ();
-        virtual void ctcSetConnected ();
+        virtual thread::Mutex const & ctcGetAccessMutex () const override;
+        virtual helpers::Socket & ctcGetSocket () override;
+        virtual helpers::Socket ctcConnect () override;
+        virtual void ctcSetConnected () override;
 
         volatile bool connected;
         helpers::SharedObjectPtr<helpers::ConnectorThread> connector;
 #endif
-
-    private:
-      // Disallow copying of instances of this class
-        SocketAppender(const SocketAppender&);
-        SocketAppender& operator=(const SocketAppender&);
     };
 
     namespace helpers {

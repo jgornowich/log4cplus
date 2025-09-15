@@ -22,8 +22,11 @@
 #include <log4cplus/thread/syncprims-pub-impl.h>
 #include <log4cplus/thread/threads.h>
 
+#if defined (LOG4CPLUS_WITH_UNIT_TESTS)
+#include <catch_amalgamated.hpp>
+#endif
 
-namespace log4cplus { namespace spi {
+namespace log4cplus::spi {
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -35,8 +38,7 @@ ObjectRegistryBase::ObjectRegistryBase()
 { }
 
 
-ObjectRegistryBase::~ObjectRegistryBase()
-{ }
+ObjectRegistryBase::~ObjectRegistryBase() = default;
 
 
 
@@ -100,8 +102,7 @@ ObjectRegistryBase::getVal(const tstring& name) const
 {
     thread::MutexGuard guard (mutex);
 
-    ObjectMap::const_iterator it (data.find (name));
-    if (it != data.end ())
+    if (auto it {data.find (name)}; it != data.end ())
         return it->second;
     else
         return nullptr;
@@ -126,5 +127,45 @@ ObjectRegistryBase::_enableLocking (bool enable)
     locking = enable;
 }
 
+#if defined (LOG4CPLUS_WITH_UNIT_TESTS)
+CATCH_TEST_CASE ("ObjectRegistryBase")
+{
 
-} } // namespace log4cplus { namespace spi {
+    class TestObjectRegistry : public ObjectRegistryBase
+    {
+    public:
+        virtual ~TestObjectRegistry ()
+        {
+            clear ();
+        }
+
+        using ObjectRegistryBase::putVal;
+        using ObjectRegistryBase::getVal;
+        using ObjectRegistryBase::clear;
+
+        virtual void deleteObject(void *object) const
+        {
+            delete static_cast<std::string *>(object);
+        }
+    };
+
+    CATCH_SECTION ("put-get")
+    {
+        TestObjectRegistry reg;
+        CATCH_REQUIRE (reg.getVal (LOG4CPLUS_TEXT ("doesnotexist")) == nullptr);
+        std::string * const str = new std::string ("test");
+        CATCH_REQUIRE (reg.putVal (LOG4CPLUS_TEXT ("a"), str));
+        // Remember, the pointer is owned by the registry, thus we can't
+        // use the `str` pointer in this statement.
+        CATCH_REQUIRE (!reg.putVal (LOG4CPLUS_TEXT ("a"),
+            new std::string ("test")));
+        std::string * const str2 = new std::string ("test2");
+        CATCH_REQUIRE (reg.putVal (LOG4CPLUS_TEXT ("b"), str2));
+        CATCH_REQUIRE (reg.getVal (LOG4CPLUS_TEXT ("a")) == str);
+        CATCH_REQUIRE (reg.getVal (LOG4CPLUS_TEXT ("b")) == str2);
+    }
+
+}
+#endif // defined (LOG4CPLUS_WITH_UNIT_TESTS)
+
+} // namespace log4cplus::spi

@@ -16,10 +16,12 @@ nobase_log4cplusinc_HEADERS = \
 	log4cplus/config/windowsh-inc.h \
 	log4cplus/configurator.h \
 	log4cplus/consoleappender.h \
+	log4cplus/exception.h \
 	log4cplus/fileappender.h \
 	log4cplus/fstreams.h \
 	log4cplus/helpers/appenderattachableimpl.h \
 	log4cplus/helpers/connectorthread.h \
+	log4cplus/helpers/eventcounter.h \
 	log4cplus/helpers/fileinfo.h \
 	log4cplus/helpers/lockfile.h \
 	log4cplus/helpers/loglog.h \
@@ -29,6 +31,7 @@ nobase_log4cplusinc_HEADERS = \
 	log4cplus/helpers/snprintf.h \
 	log4cplus/helpers/socket.h \
 	log4cplus/helpers/socketbuffer.h \
+	log4cplus/helpers/source_location.h \
 	log4cplus/helpers/stringhelper.h \
 	log4cplus/helpers/thread-config.h \
 	log4cplus/helpers/timehelper.h \
@@ -40,6 +43,7 @@ nobase_log4cplusinc_HEADERS = \
 	log4cplus/internal/env.h \
 	log4cplus/internal/internal.h \
 	log4cplus/internal/socket.h \
+	log4cplus/internal/threadsafetyanalysis.h \
 	log4cplus/layout.h \
 	log4cplus/log4cplus.h \
 	log4cplus/log4judpappender.h \
@@ -53,6 +57,8 @@ nobase_log4cplusinc_HEADERS = \
 	log4cplus/nullappender.h \
 	log4cplus/qt4debugappender.h \
 	log4cplus/qt5debugappender.h \
+	log4cplus/qt6debugappender.h \
+	log4cplus/qt6messagehandler.h \
 	log4cplus/socketappender.h \
 	log4cplus/spi/appenderattachable.h \
 	log4cplus/spi/factory.h \

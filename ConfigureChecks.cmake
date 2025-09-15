@@ -55,6 +55,9 @@ find_library(LIBPOSIX4 posix4)
 find_library(LIBCPOSIX cposix)
 find_library(LIBSOCKET socket)
 find_library(LIBWS2_32 ws2_32)
+if (ANDROID)
+  find_library (ANDROID_LOG_LIB log REQUIRED)
+endif (ANDROID)
 
 check_function_exists(gmtime_r      LOG4CPLUS_HAVE_GMTIME_R )
 check_function_exists(localtime_r   LOG4CPLUS_HAVE_LOCALTIME_R )
@@ -63,6 +66,7 @@ check_function_exists(getpid        LOG4CPLUS_HAVE_GETPID )
 check_function_exists(poll          LOG4CPLUS_HAVE_POLL )
 check_function_exists(pipe          LOG4CPLUS_HAVE_PIPE )
 check_function_exists(pipe2         LOG4CPLUS_HAVE_PIPE2 )
+check_function_exists(accept4       LOG4CPLUS_HAVE_ACCEPT4 )
 check_function_exists(ftime         LOG4CPLUS_HAVE_FTIME )
 check_function_exists(stat          LOG4CPLUS_HAVE_STAT )
 check_function_exists(lstat         LOG4CPLUS_HAVE_LSTAT )
@@ -84,6 +88,7 @@ check_function_exists(_vsnprintf_s  LOG4CPLUS_HAVE__VSNPRINTF_S )
 check_function_exists(_vsnwprintf_s LOG4CPLUS_HAVE__VSNWPRINTF_S )
 check_function_exists(mbstowcs      LOG4CPLUS_HAVE_MBSTOWCS )
 check_function_exists(wcstombs      LOG4CPLUS_HAVE_WCSTOMBS )
+check_function_exists(gettid        LOG4CPLUS_HAVE_GETTID_FUNC )
 
 
 check_symbol_exists(ENAMETOOLONG          errno.h       LOG4CPLUS_HAVE_ENAMETOOLONG )
@@ -123,6 +128,41 @@ endif()
 check_function_exists(gethostbyname_r LOG4CPLUS_HAVE_GETHOSTBYNAME_R) # TODO more complicated test in AC
 check_function_exists(getaddrinfo     LOG4CPLUS_HAVE_GETADDRINFO ) # TODO more complicated test in AC
 
+# Check availability of __attribute__ ((init_priority ((prio))))
+if(NOT DEFINED LOG4CPLUS_HAVE_VAR_ATTRIBUTE_INIT_PRIORITY)
+  check_c_source_compiles(
+    "#if defined (__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ <= 1))
+     # error Please fail.
+     #endif
+
+     __attribute__ ((__init_priority__ ((200)))) int x = 1;
+
+     int main(void) { return x == 1 ? 0 : 1; }"
+     HAVE_VAR_ATTRIBUTE_INIT_PRIORITY
+  )
+  if(HAVE_VAR_ATTRIBUTE_INIT_PRIORITY)
+    set(LOG4CPLUS_HAVE_VAR_ATTRIBUTE_INIT_PRIORITY "1")
+  endif()
+endif()
+
+# Check availability of __attribute__((constructor(priority))).
+if(NOT DEFINED LOG4CPLUS_HAVE_FUNC_ATTRIBUTE_CONSTRUCTOR_PRIORITY)
+  check_c_source_compiles(
+    "#if defined (__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ <= 1))
+     # error Please fail.
+     #endif
+
+     int x = 0;
+     __attribute__((__constructor__(200))) int foo();
+     int foo() { return 1; }
+
+     int main(void) { return x == 1 ? 0 : 1; }"
+    HAVE_FUNC_ATTRIBUTE_CONSTRUCTOR_PRIORITY
+  )
+  if(HAVE_FUNC_ATTRIBUTE_CONSTRUCTOR_PRIORITY)
+    set(LOG4CPLUS_HAVE_FUNC_ATTRIBUTE_CONSTRUCTOR_PRIORITY "1")
+  endif()
+endif()
 
 # check for declspec stuff
 if(NOT DEFINED LOG4CPLUS_DECLSPEC_EXPORT)

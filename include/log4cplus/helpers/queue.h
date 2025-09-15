@@ -56,6 +56,12 @@ public:
     explicit Queue (unsigned len = 100);
     virtual ~Queue ();
 
+    Queue (Queue const &) = delete;
+    Queue (Queue &&) = delete;
+
+    Queue & operator = (Queue const &) = delete;
+    Queue & operator = (Queue &&) = delete;
+
     // Producers' methods.
 
     //! Puts event <code>ev</code> into queue, sets QUEUE flag and
@@ -120,7 +126,7 @@ public:
         //! ERROR_BIT signals error.
         ERROR_BIT   = 0x0010,
 
-        //! ERROR_AFTER signals error that has occured after queue has
+        //! ERROR_AFTER signals error that has occurred after queue has
         //! already been touched.
         ERROR_AFTER = 0x0020
     };
@@ -140,10 +146,6 @@ protected:
 
     //! State flags.
     flags_type flags;
-
-private:
-    Queue (Queue const &);
-    Queue & operator = (Queue const &);
 };
 
 

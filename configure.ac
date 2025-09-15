@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-dnl This version of log4cplus requires the follwing autotools versions:
+dnl This version of log4cplus requires the following autotools versions:
 dnl autoconf-2.69
 dnl automake-1.16.1
 dnl libtool-2.4.6
@@ -11,6 +11,8 @@ AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([1.16.1 no-define no-dist nostdinc foreign subdir-objects -Wall])
 AC_CONFIG_TESTDIR([tests])
 AM_MAINTAINER_MODE([enable])
+AC_SYS_LARGEFILE
+AC_SYS_YEAR2038
 AM_PROG_AR
 
 #
@@ -61,7 +63,7 @@ AS_IF([test "x$with_working_locale" = "xno" \
   -a "x$with_working_c_locale" = "xno" \
   -a "x$with_iconv" = "xno"],
   [AC_MSG_WARN([Neither C++ locale support nor C locale support \
-nor iconv() support requested, using poor man's locale conversion.])])
+nor iconv() support requested, using poor man's locale conversion.])]) dnl '
 
 dnl Debugging or release build?
 
@@ -109,6 +111,14 @@ AS_IF([test "x$enable_implicit_initialization" = "xyes"],
   [],
   [AS_VAR_APPEND([CPPFLAGS], [" -DLOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION=1"])])
 
+dnl Enable thread pool
+
+LOG4CPLUS_ARG_ENABLE([thread-pool],
+  [Instantiate internal thread pool for when AsyncAppend=true. [default=yes]],
+  [enable_thread_pool=yes])
+AS_IF([test "x$enable_thread_pool" = "xyes"],
+  [AS_VAR_APPEND([CPPFLAGS], [" -DLOG4CPLUS_ENABLE_THREAD_POOL=1"])])
+
 dnl Enable release version.
 
 LOG4CPLUS_ARG_ENABLE([release-version],
@@ -136,6 +146,7 @@ AS_VAR_SET([BUILD_WITH_WCHAR_T_SUPPORT], [$with_wchar_t_support])
 AC_SUBST([BUILD_WITH_WCHAR_T_SUPPORT])
 
 dnl Enable tests
+
 LOG4CPLUS_ARG_ENABLE([tests],
   [Enable tests [default=yes]],
   [enable_tests=yes])
@@ -147,6 +158,8 @@ dnl Enable unit tests
 LOG4CPLUS_ARG_ENABLE([unit-tests],
   [Enable unit tests [default=no]],
   [enable_unit_tests=no])
+AM_CONDITIONAL([ENABLE_UNIT_TESTS],
+  [test "x$enable_unit_tests" = "xyes"])
 
 LOG4CPLUS_DEFINE_MACRO_IF([LOG4CPLUS_WITH_UNIT_TESTS],
   [Defined to enable unit tests.],
@@ -166,9 +179,11 @@ AC_PROG_CXX
 AC_PROG_CXXCPP
 AC_LANG([C++])
 
-AX_CXX_COMPILE_STDCXX_17
+AX_CXX_COMPILE_STDCXX([23],[],[mandatory])
 
 AS_VAR_APPEND([CPPFLAGS], [" -D_GNU_SOURCE=1"])
+
+AC_SYS_YEAR2038
 
 AS_CASE(["$target_os"],
   [mingw*],
@@ -256,7 +271,7 @@ AS_CASE([$ax_cv_cxx_compiler_vendor],
         [mingw*], [],
         [AX_CXXFLAGS_GCC_OPTION([-Wold-style-cast])])
       dnl AX_CXXFLAGS_GCC_OPTION([-Wabi])
-      AX_CXXFLAGS_GCC_OPTION([-Wc++14-compat])
+      AX_CXXFLAGS_GCC_OPTION([-Wc++23-compat])
       dnl AX_CXXFLAGS_GCC_OPTION([-Wconversion])
       AX_CXXFLAGS_GCC_OPTION([-Wundef])
       AX_CXXFLAGS_GCC_OPTION([-Wshadow])
@@ -269,7 +284,8 @@ AS_CASE([$ax_cv_cxx_compiler_vendor],
       AX_CXXFLAGS_GCC_OPTION([-Wno-variadic-macros])
       AX_CXXFLAGS_GCC_OPTION([-Wduplicated-branches])
       AX_CXXFLAGS_GCC_OPTION([-Wdangling-else])
-      AX_CXXFLAGS_GCC_OPTION([-Wmultistatement-macros])])
+      AX_CXXFLAGS_GCC_OPTION([-Wmultistatement-macros])
+      AX_CXXFLAGS_GCC_OPTION([-Wthread-safety])])
 
    AS_IF([test "x$enable_debugging" = "xyes"],
      [AX_CXXFLAGS_GCC_OPTION([-g3])
@@ -412,6 +428,7 @@ LOG4CPLUS_DEFINE_MACRO_IF([LOG4CPLUS_HAVE_VAR_ATTRIBUTE_INIT_PRIORITY],
 
 dnl Checks for libraries.
 
+AC_LANG_PUSH([C])
 AC_SEARCH_LIBS([__atomic_fetch_and_4], [atomic])
 AC_SEARCH_LIBS([strerror], [cposix])
 dnl On some systems libcompat exists only as a static library which
@@ -422,6 +439,7 @@ AC_SEARCH_LIBS([setsockopt], [socket network net])
 AS_IF([test "x$with_iconv" = "xyes"],
   [AC_SEARCH_LIBS([iconv_open], [iconv], [],
      [AC_SEARCH_LIBS([libiconv_open], [iconv])])])
+AC_LANG_POP([C])
 
 dnl Windows/MinGW specific.
 
@@ -441,7 +459,8 @@ AS_CASE(["$target_os"],
 
 dnl Checks for header files.
 
-AC_HEADER_STDC
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
 
 LOG4CPLUS_CHECK_HEADER([sys/types.h], [LOG4CPLUS_HAVE_SYS_TYPES_H])
 LOG4CPLUS_CHECK_HEADER([sys/socket.h], [LOG4CPLUS_HAVE_SYS_SOCKET_H])
@@ -468,7 +487,7 @@ LOG4CPLUS_CHECK_HEADER([poll.h], [LOG4CPLUS_HAVE_POLL_H])
 AS_IF([test "x$with_iconv" = "xyes"],
   [LOG4CPLUS_CHECK_HEADER([iconv.h], [LOG4CPLUS_HAVE_ICONV_H])])
 
-dnl Check for the existance of type socklen_t.
+dnl Check for the existence of type socklen_t.
 
 AX_TYPE_SOCKLEN_T
 
@@ -497,7 +516,9 @@ dnl Multi threaded library.
    AS_VAR_APPEND([LIBS], [" $PTHREAD_LIBS"])
 
    dnl required on HP-UX
+   AC_LANG_PUSH([C])
    AC_SEARCH_LIBS([sem_init], [rt])
+   AC_LANG_POP([C])
 
    AS_CASE([$ax_cv_cxx_compiler_vendor],
      [gnu|clang],
@@ -548,6 +569,7 @@ LOG4CPLUS_CHECK_FUNCS([getpid], [LOG4CPLUS_HAVE_GETPID])
 LOG4CPLUS_CHECK_FUNCS([poll], [LOG4CPLUS_HAVE_POLL])
 LOG4CPLUS_CHECK_FUNCS([pipe], [LOG4CPLUS_HAVE_PIPE])
 LOG4CPLUS_CHECK_FUNCS([pipe2], [LOG4CPLUS_HAVE_PIPE2])
+LOG4CPLUS_CHECK_FUNCS([accept4], [LOG4CPLUS_HAVE_ACCEPT4])
 LOG4CPLUS_CHECK_FUNCS([ftime], [LOG4CPLUS_HAVE_FTIME])
 LOG4CPLUS_CHECK_FUNCS([stat], [LOG4CPLUS_HAVE_STAT])
 LOG4CPLUS_CHECK_FUNCS([lstat], [LOG4CPLUS_HAVE_LSTAT])
@@ -609,7 +631,18 @@ LOG4CPLUS_DEFINE_MACRO_IF([LOG4CPLUS_HAVE_GETHOSTBYNAME_R],
   [Define if gethostbyname_r() is provided.],
   [test "x$ax_cv_have_gethostbyname_r" = "xyes"], [1])
 
-AC_CACHE_CHECK([for gettid], [ax_cv_have_gettid],
+AC_CACHE_CHECK([for gettid function], [ax_cv_have_gettid_func],
+  [AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>], [pid_t rv = gettid();])],
+    [ax_cv_have_gettid_func=yes],
+    [ax_cv_have_gettid_func=no])])
+LOG4CPLUS_DEFINE_MACRO_IF([LOG4CPLUS_HAVE_GETTID_FUNC],
+  [Define if gettid() function is available.],
+  [test "x$ax_cv_have_gettid_func" = "xyes"], [1])
+
+AC_CACHE_CHECK([for gettid syscall], [ax_cv_have_gettid],
   [AC_COMPILE_IFELSE(
     [AC_LANG_PROGRAM([#include <sys/types.h>
 #include <sys/syscall.h>
@@ -649,6 +682,22 @@ AS_IF([test "x$with_qt5" = "xyes"],
 AM_CONDITIONAL([QT5], [test "x$with_qt5" = "xyes"])
 AC_SUBST([QT5_CFLAGS])
 AC_SUBST([QT5_LIBS])
+
+dnl Qt6 setup using pkg-config.
+
+LOG4CPLUS_ARG_WITH([qt6],
+  [Build liblog4cplusqt6debugappender.],
+  [with_qt6=no])
+
+AS_IF([test "x$with_qt6" = "xyes"],
+  [PKG_CHECK_MODULES([QT6], [Qt6Core >= 6.0.0])],
+  [QT6_CFLAGS=
+   QT6_LIBS=])
+AM_CONDITIONAL([QT6], [test "x$with_qt6" = "xyes"])
+WITH_QT6="$with_qt6"
+AC_SUBST([WITH_QT6])
+AC_SUBST([QT6_CFLAGS])
+AC_SUBST([QT6_LIBS])
 
 dnl SWIG generated bindings related configure machinery is here.
 

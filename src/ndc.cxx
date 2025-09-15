@@ -24,7 +24,7 @@
 #include <algorithm>
 
 #if defined (LOG4CPLUS_WITH_UNIT_TESTS)
-#include <catch.hpp>
+#include <catch_amalgamated.hpp>
 #endif
 
 
@@ -66,7 +66,6 @@ init_full_message (log4cplus::tstring & fullMessage,
 DiagnosticContext::DiagnosticContext(const log4cplus::tstring& message_,
                                      DiagnosticContext const * parent)
     : message(message_)
-    , fullMessage()
 {
     init_full_message (fullMessage, message, parent);
 }
@@ -75,7 +74,6 @@ DiagnosticContext::DiagnosticContext(const log4cplus::tstring& message_,
 DiagnosticContext::DiagnosticContext(tchar const * message_,
                                      DiagnosticContext const * parent)
     : message(message_)
-    , fullMessage()
 {
     init_full_message (fullMessage, message, parent);
 }
@@ -95,10 +93,7 @@ DiagnosticContext::DiagnosticContext(tchar const * message_)
 }
 
 
-DiagnosticContext::DiagnosticContext (DiagnosticContext const & other)
-    : message (other.message)
-    , fullMessage (other.fullMessage)
-{ }
+DiagnosticContext::DiagnosticContext (DiagnosticContext const & other) = default;
 
 
 DiagnosticContext & DiagnosticContext::operator = (
@@ -136,11 +131,11 @@ DiagnosticContext::swap (DiagnosticContext & other)
 ///////////////////////////////////////////////////////////////////////////////
 
 NDC::NDC()
-{ }
+= default;
 
 
 NDC::~NDC()
-{ }
+= default;
 
 
 
@@ -254,11 +249,11 @@ NDC::push_worker (StringType const & message)
 {
     DiagnosticContextStack* ptr = getPtr();
     if (ptr->empty())
-        ptr->push_back( DiagnosticContext(message, nullptr) );
+        ptr->emplace_back (message, nullptr);
     else
     {
         DiagnosticContext const & dc = ptr->back();
-        ptr->push_back( DiagnosticContext(message, &dc) );
+        ptr->emplace_back (message, &dc);
     }
 }
 

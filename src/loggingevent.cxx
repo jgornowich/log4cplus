@@ -23,7 +23,7 @@
 #include <algorithm>
 
 
-namespace log4cplus {  namespace spi {
+namespace log4cplus::spi {
 
 
 static const int LOG4CPLUS_DEFAULT_TYPE = 1;
@@ -40,9 +40,6 @@ InternalLoggingEvent::InternalLoggingEvent(
     : message(message_)
     , loggerName(logger)
     , ll(loglevel)
-    , ndc()
-    , mdc()
-    , thread()
     , timestamp(log4cplus::helpers::now ())
     , file(filename
         ? LOG4CPLUS_C_STR_TO_TSTRING(filename)
@@ -55,35 +52,6 @@ InternalLoggingEvent::InternalLoggingEvent(
     , thread2Cached(false)
     , ndcCached(false)
     , mdcCached(false)
-{
-}
-
-
-InternalLoggingEvent::InternalLoggingEvent(
-    const log4cplus::tstring_view& logger,
-    LogLevel loglevel, const log4cplus::tstring_view& ndc_,
-    MappedDiagnosticContextMap const & mdc_,
-    const log4cplus::tstring_view& message_,
-    const log4cplus::tstring_view& thread_,
-    log4cplus::helpers::Time time,
-    const log4cplus::tstring_view& file_, int line_,
-    const log4cplus::tstring_view& function_)
-    : message(message_)
-    , loggerName(logger)
-    , ll(loglevel)
-    , ndc(ndc_)
-    , mdc(mdc_)
-    , thread(thread_)
-    , timestamp(time)
-    , file(file_)
-    , function (function_.data ()
-        ? function_
-        : log4cplus::tstring())
-    , line(line_)
-    , threadCached(true)
-    , thread2Cached(true)
-    , ndcCached(true)
-    , mdcCached(true)
 {
 }
 
@@ -121,7 +89,6 @@ InternalLoggingEvent::InternalLoggingEvent(
 
 InternalLoggingEvent::InternalLoggingEvent ()
     : ll (NOT_SET_LOG_LEVEL)
-    , function ()
     , line (0)
     , threadCached(false)
     , thread2Cached(false)
@@ -151,9 +118,7 @@ InternalLoggingEvent::InternalLoggingEvent(
 }
 
 
-InternalLoggingEvent::~InternalLoggingEvent()
-{
-}
+InternalLoggingEvent::~InternalLoggingEvent() = default;
 
 
 
@@ -178,7 +143,7 @@ InternalLoggingEvent::setLoggingEvent (const log4cplus::tstring_view & logger,
     LogLevel loglevel, const log4cplus::tstring_view & msg,
     const char * filename, int fline, const char * function_)
 {
-    // This could be imlemented using the swap idiom:
+    // This could be implemented using the swap idiom:
     //
     // InternalLoggingEvent (logger, loglevel, msg, filename, fline).swap (*this);
     //
@@ -255,8 +220,7 @@ tstring const &
 InternalLoggingEvent::getMDC (tstring const & key) const
 {
     MappedDiagnosticContextMap const & mdc_ = getMDCCopy ();
-    MappedDiagnosticContextMap::const_iterator it = mdc_.find (key);
-    if (it != mdc_.end ())
+    if (auto it = mdc_.find (key); it != mdc_.end ())
         return it->second;
     else
         return internal::empty_str;
@@ -304,4 +268,4 @@ InternalLoggingEvent::swap (InternalLoggingEvent & other)
 }
 
 
-} } // namespace log4cplus {  namespace spi {
+} // namespace log4cplus::spi

@@ -1,16 +1,18 @@
 lib_LTLIBRARIES = liblog4cplus.la
 
-SINGLE_THREADED_SRC = \
+LIB_SRC = \
 	%D%/appenderattachableimpl.cxx \
 	%D%/appender.cxx \
 	%D%/asyncappender.cxx \
-        %D%/callbackappender.cxx \
+	%D%/callbackappender.cxx \
 	%D%/clogger.cxx \
 	%D%/configurator.cxx \
 	%D%/connectorthread.cxx \
 	%D%/consoleappender.cxx \
 	%D%/cygwin-win32.cxx \
 	%D%/env.cxx \
+	%D%/eventcounter.cxx \
+	%D%/exception.cxx \
 	%D%/factory.cxx \
 	%D%/fileappender.cxx \
 	%D%/fileinfo.cxx \
@@ -55,10 +57,16 @@ SINGLE_THREADED_SRC = \
 	%D%/version.cxx \
 	%D%/win32consoleappender.cxx \
 	%D%/win32debugappender.cxx
-
-LIB_SRC = $(SINGLE_THREADED_SRC)
+if ENABLE_UNIT_TESTS
+LIB_SRC+= \
+	%D%/boost_tests.cxx \
+	$(top_srcdir)/catch/extras/catch_amalgamated.cpp
+endif
 
 common_liblog4cplus_la_cppflags = $(AM_CPPFLAGS) -DINSIDE_LOG4CPLUS
+if ENABLE_UNIT_TESTS
+common_liblog4cplus_la_cppflags+=-DCATCH_AMALGAMATED_CUSTOM_MAIN=1
+endif
 liblog4cplus_la_CPPFLAGS = $(common_liblog4cplus_la_cppflags)
 
 common_liblog4cplus_la_sources = $(LIB_SRC)
@@ -73,7 +81,7 @@ endif
 common_liblog4cplus_la_ldflags = -no-undefined \
 	$(LOG4CPLUS_VERSION_LT_FLAGS) \
 	$(LOG4CPLUS_PROFILING_LDFLAGS) \
-        $(LOG4CPLUS_LTO_LDFLAGS) \
+	$(LOG4CPLUS_LTO_LDFLAGS) \
 	$(LOG4CPLUS_AIX_XLC_LDFLAGS) \
 	$(LOG4CPLUS_EXPORT_SYMBOLS_REGEX)
 liblog4cplus_la_LDFLAGS = $(common_liblog4cplus_la_ldflags)

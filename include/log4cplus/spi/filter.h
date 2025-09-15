@@ -49,7 +49,7 @@ namespace log4cplus {
     namespace spi {
 
 
-        enum FilterResult { DENY, /**< The log event must be dropped immediately
+        enum class FilterResult { DENY, /**< The log event must be dropped immediately
                                    *  without consulting with the remaining
                                    *  filters, if any, in the chain. */
                             NEUTRAL, /**< This filter is neutral with respect to
@@ -156,7 +156,7 @@ namespace log4cplus {
              * Always returns the {@link #DENY} regardless of the
              * {@link InternalLoggingEvent} parameter.
              */
-            virtual FilterResult decide(const InternalLoggingEvent& event) const;
+            virtual FilterResult decide(const InternalLoggingEvent& event) const override;
         };
 
 
@@ -186,7 +186,7 @@ namespace log4cplus {
              * The returned decision is {@link #DENY} if the <b>AcceptOnMatch</b>
              * property is set to <code>false</code>.
              */
-            virtual FilterResult decide(const InternalLoggingEvent& event) const;
+            virtual FilterResult decide(const InternalLoggingEvent& event) const override;
 
         private:
           // Methods
@@ -218,7 +218,7 @@ namespace log4cplus {
          * minimum acceptable LogLevel (ie a LogLevel is never rejected for
          * being too "low"/unimportant).  If <code>LogLevelMax</code> is not
          * defined, then there is no maximum acceptable LogLevel (ie a
-         * LogLevel is never rejected for beeing too "high"/important).
+         * LogLevel is never rejected for being too "high"/important).
          *
          * Refer to the {@link
          * Appender#setThreshold setThreshold} method
@@ -234,7 +234,7 @@ namespace log4cplus {
             /**
              * Return the decision of this filter.
              */
-            virtual FilterResult decide(const InternalLoggingEvent& event) const;
+            virtual FilterResult decide(const InternalLoggingEvent& event) const override;
 
         private:
           // Methods
@@ -269,7 +269,7 @@ namespace log4cplus {
             /**
              * Returns {@link #NEUTRAL} is there is no string match.
              */
-            virtual FilterResult decide(const InternalLoggingEvent& event) const;
+            virtual FilterResult decide(const InternalLoggingEvent& event) const override;
 
         private:
           // Methods
@@ -297,7 +297,7 @@ namespace log4cplus {
             /**
              * Returns result returned by `function`.
              */
-            virtual FilterResult decide(const InternalLoggingEvent&) const;
+            virtual FilterResult decide(const InternalLoggingEvent&) const override;
 
         private:
             Function function;
@@ -335,7 +335,7 @@ namespace log4cplus {
                 /**
                  * Returns {@link #NEUTRAL} is there is no string match.
                  */
-                virtual FilterResult decide(const InternalLoggingEvent& event) const;
+                virtual FilterResult decide(const InternalLoggingEvent& event) const override;
 
             private:
               // Methods
@@ -381,7 +381,7 @@ namespace log4cplus {
                 /**
                  * Returns {@link #NEUTRAL} is there is no string match.
                  */
-                virtual FilterResult decide(const InternalLoggingEvent& event) const;
+                virtual FilterResult decide(const InternalLoggingEvent& event) const override;
 
             private:
               // Methods

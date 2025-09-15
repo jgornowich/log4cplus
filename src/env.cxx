@@ -25,6 +25,8 @@
 #include <log4cplus/helpers/stringhelper.h>
 #include <log4cplus/helpers/loglog.h>
 #include <log4cplus/helpers/fileinfo.h>
+#include <log4cplus/helpers/property.h>
+#include <log4cplus/spi/factory.h>
 #include <log4cplus/streams.h>
 
 #ifdef LOG4CPLUS_HAVE_SYS_TYPES_H
@@ -56,9 +58,9 @@
 #include <functional>
 #include <stdexcept>
 #include <memory>
+#include <utility>
 
-
-namespace log4cplus { namespace internal {
+namespace log4cplus::internal {
 
 #if defined(_WIN32)
 tstring const dir_sep(LOG4CPLUS_TEXT("\\"));
@@ -127,6 +129,7 @@ get_env_var (tstring & value, tstring const & name)
         helpers::getLogLog().error(
             LOG4CPLUS_TEXT ("_dupenv_s failed. Error: ")
             + helpers::convertIntegerToString (eno), true);
+        std::unreachable ();
     }
 
     return !! buf;
@@ -147,6 +150,31 @@ get_env_var (tstring & value, tstring const & name)
     return !! val;
 
 #endif
+}
+
+
+std::locale
+get_locale_by_name(tstring const& locale_name)
+{
+    try
+    {
+        spi::LocaleFactoryRegistry& reg = spi::getLocaleFactoryRegistry();
+        spi::LocaleFactory* fact = reg.get(locale_name);
+        if (fact)
+        {
+            helpers::Properties props;
+            props.setProperty(LOG4CPLUS_TEXT("Locale"), locale_name);
+            return fact->createObject(props);
+        }
+        else
+            return std::locale(LOG4CPLUS_TSTRING_TO_STRING(locale_name).c_str());
+    }
+    catch (std::runtime_error const&)
+    {
+        helpers::getLogLog().error(
+            LOG4CPLUS_TEXT("Failed to create locale " + locale_name));
+        return std::locale();
+    }
 }
 
 
@@ -209,8 +237,7 @@ namespace
 
 struct path_sep_comp
 {
-    path_sep_comp ()
-    { }
+    path_sep_comp () = default;
 
     bool
     operator () (tchar ch) const
@@ -314,10 +341,13 @@ get_current_dir ()
             if (eno == ERANGE)
                 buf_size *= 2;
             else
+            {
                 helpers::getLogLog ().error (
                     LOG4CPLUS_TEXT ("getcwd: ")
                     + helpers::convertIntegerToString (eno),
                     true);
+                std::unreachable();
+            }
         }
     }
     while (! ret);
@@ -355,7 +385,7 @@ split_into_components(Container & components, tstring const & path,
     while (it != end)
     {
         tstring::const_iterator sep = std::find_if (it, end, is_sep);
-        components.push_back (tstring (it, sep));
+        components.emplace_back (it, sep);
         it = sep;
         if (it != end)
             ++it;
@@ -670,4 +700,4 @@ make_dirs (tstring const & file_path)
 }
 
 
-} } // namespace log4cplus { namespace internal {
+} // namespace log4cplus::internal

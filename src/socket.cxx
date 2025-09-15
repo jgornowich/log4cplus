@@ -22,8 +22,11 @@
 #include <log4cplus/internal/socket.h>
 #include <log4cplus/internal/internal.h>
 
+#if defined (LOG4CPLUS_WITH_UNIT_TESTS)
+#include <catch_amalgamated.hpp>
+#endif
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 
 extern LOG4CPLUS_EXPORT SOCKET_TYPE const INVALID_SOCKET_VALUE
@@ -40,7 +43,7 @@ extern LOG4CPLUS_EXPORT SOCKET_TYPE const INVALID_SOCKET_VALUE
 
 AbstractSocket::AbstractSocket()
     : sock(INVALID_SOCKET_VALUE),
-      state(not_opened),
+      state(SocketState::not_opened),
       err(0)
 {
 }
@@ -81,7 +84,7 @@ AbstractSocket::close()
     {
         closeSocket(sock);
         sock = INVALID_SOCKET_VALUE;
-        state = not_opened;
+        state = SocketState::not_opened;
     }
 }
 
@@ -157,8 +160,7 @@ Socket::Socket (Socket && other) LOG4CPLUS_NOEXCEPT
 { }
 
 
-Socket::~Socket()
-{ }
+Socket::~Socket() = default;
 
 
 Socket &
@@ -263,4 +265,26 @@ openSocket(unsigned short port, bool udp, bool ipv6, SocketState& state)
 }
 
 
-} } // namespace log4cplus { namespace helpers {
+#if defined (LOG4CPLUS_WITH_UNIT_TESTS)
+CATCH_TEST_CASE ("Socket", "[sockets]")
+{
+    CATCH_SECTION ("hostname resolution")
+    {
+        CATCH_SECTION ("FQDN")
+        {
+            auto result = getHostname(true);
+            CATCH_REQUIRE (result.has_value ());
+
+        }
+
+        CATCH_SECTION ("non-FQDN")
+        {
+            auto result = getHostname(false);
+            CATCH_REQUIRE (result.has_value ());
+        }
+    }
+}
+#endif // LOG4CPLUS_WITH_UNIT_TESTS
+
+
+} // namespace log4cplus::helpers

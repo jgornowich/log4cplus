@@ -279,11 +279,10 @@ Hierarchy::getInstanceImpl(const tstring_view& name,
     spi::LoggerFactory& factory)
 {
     Logger logger;
-    LoggerMap::iterator lm_it;
 
     if (name.empty ())
         logger = root;
-    else if ((lm_it = loggerPtrs.find(name)) != loggerPtrs.end())
+    else if (auto lm_it = loggerPtrs.find(name); lm_it != loggerPtrs.end())
         logger = lm_it->second;
     else
     {
@@ -295,10 +294,10 @@ Hierarchy::getInstanceImpl(const tstring_view& name,
             helpers::getLogLog().error(
                 LOG4CPLUS_TEXT("Hierarchy::getInstanceImpl()- Insert failed"),
                 true);
+            std::unreachable ();
         }
 
-        auto pnm_it = provisionNodes.find(name);
-        if (pnm_it != provisionNodes.end())
+        if (auto pnm_it = provisionNodes.find(name); pnm_it != provisionNodes.end())
         {
             updateChildren(pnm_it->second, logger);
             provisionNodes.erase(pnm_it);
@@ -327,25 +326,25 @@ Hierarchy::updateParents(Logger const & logger)
     bool parentFound = false;
     tstring substr;
 
-    // if name = "w.x.y.z", loop thourgh "w.x.y", "w.x" and "w", but not "w.x.y.z"
+    // if name = "w.x.y.z", loop through "w.x.y", "w.x" and "w", but not "w.x.y.z"
     for(std::size_t i=name.find_last_of(LOG4CPLUS_TEXT('.'), length-1);
         i != tstring::npos && i > 0;
         i = name.find_last_of(LOG4CPLUS_TEXT('.'), i-1))
     {
         substr.assign (name, 0, i);
 
-        auto it = loggerPtrs.find(substr);
-        if(it != loggerPtrs.end()) {
+        if (auto it = loggerPtrs.find(substr); it != loggerPtrs.end())
+        {
             parentFound = true;
             logger.value->parent = it->second.value;
             break;  // no need to update the ancestors of the closest ancestor
         }
-        else {
-            auto it2 = provisionNodes.find(substr);
-            if(it2 != provisionNodes.end()) {
+        else
+        {
+            if (auto it2 = provisionNodes.find(substr); it2 != provisionNodes.end())
                 it2->second.push_back(logger);
-            }
-            else {
+            else
+            {
                 ProvisionNode node;
                 node.push_back(logger);
                 std::pair<ProvisionNodeMap::iterator, bool> tmp =
@@ -354,6 +353,7 @@ Hierarchy::updateParents(Logger const & logger)
                     helpers::getLogLog().error(
                         LOG4CPLUS_TEXT("Hierarchy::updateParents()- Insert failed"),
                         true);
+                    std::unreachable ();
                 }
             }
         } // end if Logger found

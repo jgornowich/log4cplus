@@ -61,6 +61,7 @@ namespace log4cplus {
 #if defined (LOG4CPLUS_HAVE_CODECVT_UTF32_FACET) && defined (UNICODE)
                 , fUTF32            = (3 << fEncodingShift)
 #endif
+                , fThrow            = (1 << 5)
             };
 
             Properties();
@@ -154,6 +155,15 @@ namespace log4cplus {
             bool get_type_val_worker (ValType & val,
                 log4cplus::tstring const & key) const;
         };
+
+
+        class LogLog;
+
+
+        bool
+        substVars (tstring & dest, const tstring & val,
+            Properties const & props, LogLog& loglog,
+            unsigned flags);
     } // end namespace helpers
 
 }

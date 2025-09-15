@@ -11,20 +11,29 @@ endif ()
 # Remove when CMake >= 2.8.4 is required
 set (CMAKE_LEGACY_CYGWIN_WIN32 0)
 
+cmake_minimum_required (VERSION 3.12)
+
 project (log4cplus)
-cmake_minimum_required (VERSION 3.8)
+
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30.0")
+  cmake_policy(SET CMP0167 NEW)
+endif ()
 
 # Use "-fPIC" / "-fPIE" for all targets by default, including static libs.
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Enable LTO / IPO by default.
+set (CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+set (CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+set (CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 
 enable_language (CXX)
 if (MSVC)
-  set (CMAKE_CXX_STANDARD 17)
+  set (CMAKE_CXX_STANDARD 23)
   if (CMAKE_VS_PLATFORM_NAME MATCHES "ARM")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
   endif ()
 else ()
-  set (CMAKE_CXX_STANDARD 17)
+  set (CMAKE_CXX_STANDARD 23)
 endif ()
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_CXX_EXTENSIONS ON)
@@ -33,9 +42,14 @@ include(GNUInstallDirs)
 include (Log4CPlusUtils.cmake)
 log4cplus_get_version ("${PROJECT_SOURCE_DIR}/include"
   log4cplus_version_major log4cplus_version_minor log4cplus_version_patch)
-message("-- Generating build for Log4cplus version ${log4cplus_version_major}.${log4cplus_version_minor}.${log4cplus_version_patch}")
+set (log4cplus_version_str "${log4cplus_version_major}.${log4cplus_version_minor}.${log4cplus_version_patch}")
+message("-- Generating build for Log4cplus version ${log4cplus_version_str}")
 set (log4cplus_soversion 0)
 set (log4cplus_postfix "")
+if (APPLE)
+  set (log4cplus_macho_current_version 7.0.0)
+  set (log4cplus_macho_compatibility_version 3.0.0)
+endif ()
 
 option(LOG4CPLUS_BUILD_TESTING "Build the test suite." ON)
 option(LOG4CPLUS_BUILD_LOGGINGSERVER "Build the logging server." ON)
@@ -44,6 +58,11 @@ option(LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION "Require explicit initializatio
 if (LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
   add_compile_definitions (LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION=1)
 endif(LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
+
+option(LOG4CPLUS_ENABLE_THREAD_POOL "Instantiate internal thread pool for when AsyncAppend=true" ON)
+if (LOG4CPLUS_ENABLE_THREAD_POOL)
+add_compile_definitions (LOG4CPLUS_ENABLE_THREAD_POOL=1)
+endif()
 
 if(NOT LOG4CPLUS_SINGLE_THREADED)
   find_package (Threads)
@@ -84,6 +103,7 @@ endif (LOG4CPLUS_SINGLE_THREADED)
 
 option (LOG4CPLUS_QT4 "Build with Qt4DebugAppender" OFF)
 option (LOG4CPLUS_QT5 "Build with Qt5DebugAppender" OFF)
+option (LOG4CPLUS_QT6 "Build with Qt6DebugAppender" OFF)
 
 option(UNICODE "Build with tchar = wchar_t" ${UNICODE_DEFAULT})
 
@@ -101,9 +121,15 @@ endif()
 option(WITH_UNIT_TESTS "Enable unit tests" ON)
 if (WITH_UNIT_TESTS)
   set (LOG4CPLUS_WITH_UNIT_TESTS 1)
-  add_compile_definitions (CATCH_CONFIG_PREFIX_ALL=1)
+  add_compile_definitions (CATCH_CONFIG_PREFIX_ALL=1
+    CATCH_AMALGAMATED_CUSTOM_MAIN=1)
   if (WIN32)
-    add_compile_definitions (LOG4CPLUS_WITH_UNIT_TESTS=1)
+    add_compile_definitions (LOG4CPLUS_WITH_UNIT_TESTS=1
+      NOMINMAX=1)
+    if (MSVC AND MSVC_TOOLSET_VERSION VERSION_LESS "143")
+      message (WARNING "Adding /Zc:hiddenFriend- compiler flag to work around Catch2 compilation issue with Visual Studio 2019")
+      add_compile_options (/Zc:hiddenFriend-)
+    endif ()
   endif (WIN32)
 endif (WITH_UNIT_TESTS)
 
@@ -154,7 +180,7 @@ configure_file(${DEFINES_HXX_CMAKE} ${DEFINES_HXX} @ONLY)
 
 include_directories (${log4cplus_SOURCE_DIR}/include
                      ${log4cplus_SOURCE_DIR}/threadpool
-                     ${log4cplus_SOURCE_DIR}/catch/single_include/catch2
+                     ${log4cplus_SOURCE_DIR}/catch/extras
                      ${log4cplus_BINARY_DIR}/include
                     )
 
@@ -188,8 +214,27 @@ endif (LOG4CPLUS_QT4)
 if (LOG4CPLUS_QT5)
   add_subdirectory (qt5debugappender)
 endif (LOG4CPLUS_QT5)
+if (LOG4CPLUS_QT6)
+  add_subdirectory (qt6debugappender)
+endif (LOG4CPLUS_QT6)
+
 
 include(Log4CPlusCPack.cmake)
+
+# generate pkgconfig file.
+set (log4cplus_pkgconfig "${CMAKE_BINARY_DIR}/lib/pkgconfig/log4cplus.pc")
+function(log4cplus_gen_pkgconfig)
+  message (STATUS "Generating ${log4cplus_pkgconfig}")
+  set(prefix "${CMAKE_INSTALL_PREFIX}")
+  set(exec_prefix "\${prefix}")
+  set(libdir "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+  set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+  set(VERSION "${log4cplus_version_major}.${log4cplus_version_minor}.${log4cplus_version_patch}")
+  configure_file(log4cplus.pc.in "${log4cplus_pkgconfig}" @ONLY)
+endfunction(log4cplus_gen_pkgconfig)
+log4cplus_gen_pkgconfig ()
+
+install(FILES "${log4cplus_pkgconfig}" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/)
 
 message (STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 message (STATUS "${CMAKE_CXX_COMPILER_ID} version ${CMAKE_CXX_COMPILER_VERSION}")

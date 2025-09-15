@@ -33,6 +33,7 @@
 #else
 #include <cctype>
 #endif
+#include <memory>
 
 
 namespace log4cplus
@@ -58,9 +59,8 @@ static
 void
 output_xml_escaped (tostream & os, tstring const & str)
 {
-    for (tstring::const_iterator it = str.begin (); it != str.end (); ++it)
+    for (tchar ch : str)
     {
-        tchar const & ch = *it;
         switch (ch)
         {
         case LOG4CPLUS_TEXT ('<'):
@@ -108,7 +108,7 @@ output_xml_escaped (tostream & os, tstring const & str)
 //! Helper manipulator like class for escaped XML output.
 struct outputXMLEscaped
 {
-    outputXMLEscaped (tstring const & s)
+    explicit outputXMLEscaped (tstring const & s)
         : str (s)
     { }
 
@@ -138,7 +138,7 @@ Log4jUdpAppender::Log4jUdpAppender(const tstring& host_, int port_, bool ipv6_)
     , port(port_)
     , ipv6(ipv6_)
 {
-    layout.reset (new PatternLayout (LOG4CPLUS_TEXT ("%m")));
+    layout = std::make_unique<PatternLayout> (LOG4CPLUS_TEXT ("%m"));
     openSocket();
 }
 

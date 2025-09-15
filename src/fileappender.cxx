@@ -27,15 +27,16 @@
 #include <log4cplus/helpers/property.h>
 #include <log4cplus/helpers/fileinfo.h>
 #include <log4cplus/spi/loggingevent.h>
-#include <log4cplus/spi/factory.h>
 #include <log4cplus/thread/syncprims-pub-impl.h>
 #include <log4cplus/internal/internal.h>
 #include <log4cplus/internal/env.h>
 #include <algorithm>
+#include <memory>
 #include <sstream>
 #include <cstdio>
 #include <stdexcept>
 #include <cmath> // std::fmod
+#include <filesystem>
 
 // For _wrename() and _wremove() on Windows.
 #include <stdio.h>
@@ -45,7 +46,7 @@
 #endif
 
 #if defined (LOG4CPLUS_WITH_UNIT_TESTS)
-#include <catch.hpp>
+#include <catch_amalgamated.hpp>
 #endif
 
 
@@ -189,30 +190,6 @@ rolloverFiles(const tstring& filename, unsigned int maxBackupIndex)
     }
 } // end rolloverFiles()
 
-
-static
-std::locale
-get_locale_by_name (tstring const & locale_name)
-{try
-{
-    spi::LocaleFactoryRegistry & reg = spi::getLocaleFactoryRegistry ();
-    spi::LocaleFactory * fact = reg.get (locale_name);
-    if (fact)
-    {
-        helpers::Properties props;
-        props.setProperty (LOG4CPLUS_TEXT ("Locale"), locale_name);
-        return fact->createObject (props);
-    }
-    else
-        return std::locale (LOG4CPLUS_TSTRING_TO_STRING (locale_name).c_str ());
-}
-catch (std::runtime_error const &)
-{
-    helpers::getLogLog ().error (
-        LOG4CPLUS_TEXT ("Failed to create locale " + locale_name));
-    return std::locale ();
-}}
-
 } // namespace
 
 
@@ -284,14 +261,14 @@ FileAppenderBase::init()
     }
 
     helpers::LockFileGuard guard;
-    if (useLockFile && ! lockFile.get ())
+    if (useLockFile && ! lockFile)
     {
         if (createDirs)
             internal::make_dirs (lockFileName);
 
         try
         {
-            lockFile.reset (new helpers::LockFile (lockFileName));
+            lockFile = std::make_unique<helpers::LockFile> (lockFileName);
             guard.attach_and_lock (*lockFile);
         }
         catch (std::runtime_error const &)
@@ -303,7 +280,7 @@ FileAppenderBase::init()
     }
 
     open(fileOpenMode);
-    imbue (get_locale_by_name (localeName));
+    imbue (internal::get_locale_by_name (localeName));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -371,7 +348,7 @@ FileAppenderBase::open(std::ios_base::openmode mode)
     if (createDirs)
         internal::make_dirs (filename);
 
-    out.open(LOG4CPLUS_FSTREAM_PREFERED_FILE_NAME(filename).c_str(), mode);
+    out.open(std::filesystem::path (filename), mode);
 
     if(!out.good()) {
         getErrorHandler()->error(LOG4CPLUS_TEXT("Unable to open file: ") + filename);
@@ -654,28 +631,28 @@ DailyRollingFileAppender::DailyRollingFileAppender(
     , maxBackupIndex(10)
     , rollOnClose(true)
 {
-    DailyRollingFileSchedule theSchedule = DAILY;
+    DailyRollingFileSchedule theSchedule = DailyRollingFileSchedule::DAILY;
     tstring scheduleStr (helpers::toUpper (
         properties.getProperty (LOG4CPLUS_TEXT ("Schedule"))));
 
     if(scheduleStr == LOG4CPLUS_TEXT("MONTHLY"))
-        theSchedule = MONTHLY;
+        theSchedule = DailyRollingFileSchedule::MONTHLY;
     else if(scheduleStr == LOG4CPLUS_TEXT("WEEKLY"))
-        theSchedule = WEEKLY;
+        theSchedule = DailyRollingFileSchedule::WEEKLY;
     else if(scheduleStr == LOG4CPLUS_TEXT("DAILY"))
-        theSchedule = DAILY;
+        theSchedule = DailyRollingFileSchedule::DAILY;
     else if(scheduleStr == LOG4CPLUS_TEXT("TWICE_DAILY"))
-        theSchedule = TWICE_DAILY;
+        theSchedule = DailyRollingFileSchedule::TWICE_DAILY;
     else if(scheduleStr == LOG4CPLUS_TEXT("HOURLY"))
-        theSchedule = HOURLY;
+        theSchedule = DailyRollingFileSchedule::HOURLY;
     else if(scheduleStr == LOG4CPLUS_TEXT("MINUTELY"))
-        theSchedule = MINUTELY;
+        theSchedule = DailyRollingFileSchedule::MINUTELY;
     else {
         helpers::getLogLog().warn(
             LOG4CPLUS_TEXT("DailyRollingFileAppender::ctor()")
             LOG4CPLUS_TEXT("- \"Schedule\" not valid: ")
             + properties.getProperty(LOG4CPLUS_TEXT("Schedule")));
-        theSchedule = DAILY;
+        theSchedule = DailyRollingFileSchedule::DAILY;
     }
 
     properties.getBool (rollOnClose, LOG4CPLUS_TEXT("RollOnClose"));
@@ -875,7 +852,7 @@ calculateNextRolloverTime(const Time& t, DailyRollingFileSchedule schedule)
     struct tm next;
     switch(schedule)
     {
-    case MONTHLY:
+    case DailyRollingFileSchedule::MONTHLY:
     {
         helpers::localTime (&next, t);
         next.tm_mon += 1;
@@ -903,7 +880,7 @@ calculateNextRolloverTime(const Time& t, DailyRollingFileSchedule schedule)
         return ret;
     }
 
-    case WEEKLY:
+    case DailyRollingFileSchedule::WEEKLY:
     {
         helpers::localTime (&next, t);
         // Round up to next week
@@ -937,7 +914,7 @@ calculateNextRolloverTime(const Time& t, DailyRollingFileSchedule schedule)
             LOG4CPLUS_TEXT (" unhandled or invalid schedule value"));
         [[fallthrough]];
 
-    case DAILY:
+    case DailyRollingFileSchedule::DAILY:
     {
         helpers::localTime(&next, t);
         next.tm_mday += 1;
@@ -965,7 +942,7 @@ calculateNextRolloverTime(const Time& t, DailyRollingFileSchedule schedule)
         return ret;
     }
 
-    case TWICE_DAILY:
+    case DailyRollingFileSchedule::TWICE_DAILY:
     {
         helpers::localTime(&next, t);
         if (next.tm_hour < 12)
@@ -995,7 +972,7 @@ calculateNextRolloverTime(const Time& t, DailyRollingFileSchedule schedule)
         return ret;
     }
 
-    case HOURLY:
+    case DailyRollingFileSchedule::HOURLY:
     {
         helpers::localTime(&next, t);
         next.tm_hour += 1;
@@ -1022,7 +999,7 @@ calculateNextRolloverTime(const Time& t, DailyRollingFileSchedule schedule)
         return ret;
     }
 
-    case MINUTELY:
+    case DailyRollingFileSchedule::MINUTELY:
         return round_time_and_add (t, chrono::seconds (60));
     };
 }
@@ -1044,11 +1021,11 @@ DailyRollingFileAppender::getFilename(const Time& t) const
     {
         switch (schedule)
         {
-        case MONTHLY:
+        case DailyRollingFileSchedule::MONTHLY:
             pattern = LOG4CPLUS_TEXT("%Y-%m");
             break;
 
-        case WEEKLY:
+        case DailyRollingFileSchedule::WEEKLY:
             pattern = LOG4CPLUS_TEXT("%Y-%W");
             break;
 
@@ -1058,19 +1035,19 @@ DailyRollingFileAppender::getFilename(const Time& t) const
                 LOG4CPLUS_TEXT (" invalid schedule value"));
             [[fallthrough]];
 
-        case DAILY:
+        case DailyRollingFileSchedule::DAILY:
             pattern = LOG4CPLUS_TEXT("%Y-%m-%d");
             break;
 
-        case TWICE_DAILY:
+        case DailyRollingFileSchedule::TWICE_DAILY:
             pattern = LOG4CPLUS_TEXT("%Y-%m-%d-%p");
             break;
 
-        case HOURLY:
+        case DailyRollingFileSchedule::HOURLY:
             pattern = LOG4CPLUS_TEXT("%Y-%m-%d-%H");
             break;
 
-        case MINUTELY:
+        case DailyRollingFileSchedule::MINUTELY:
             pattern = LOG4CPLUS_TEXT("%Y-%m-%d-%H-%M");
             break;
         };
@@ -1092,14 +1069,33 @@ static tstring
 preprocessDateTimePattern(const tstring_view& pattern, DailyRollingFileSchedule& schedule)
 {
     // Example: "yyyy-MM-dd HH:mm:ss,aux"
+    // Example with space(s) between the ',' and 'aux': "yyyy-MM-dd HH:mm:ss, aux"
     // Patterns from java.text.SimpleDateFormat not implemented here: Y, F, k, K, S, X
 
     tostringstream result;
 
-    bool auxilary = (pattern.find(LOG4CPLUS_TEXT(",aux")) == pattern.length()-4);
+    size_t aux_len = 0;
+    auto pattern_length = pattern.length();
+    if (pattern_length >= 4 && pattern.find(LOG4CPLUS_TEXT("aux"), pattern_length-3) == pattern_length-3) {
+        auto const comma_pos = pattern.rfind(LOG4CPLUS_TEXT(","));
+        if (comma_pos != tstring_view::npos) {
+            auto const comma_to_aux_len = pattern_length - 4 - comma_pos;
+            if (comma_to_aux_len == 0) {
+                aux_len = 4;
+            }
+            else if (comma_to_aux_len > 0) {
+                auto const space_str = pattern.substr(comma_pos+1, comma_to_aux_len);
+                if (space_str == tstring(comma_to_aux_len, ' ')) {
+                    aux_len = 4 + comma_to_aux_len;
+                }
+            }
+            pattern_length -= aux_len;
+        }
+    }
+
     bool has_week = false, has_day = false, has_hour = false, has_minute = false;
 
-    for (size_t i = 0, pattern_length = pattern.length(); i < pattern_length; )
+    for (size_t i = 0; i < pattern_length; )
     {
         tchar c = pattern[i];
         size_t end_pos = pattern.find_first_not_of(c, i);
@@ -1201,18 +1197,18 @@ preprocessDateTimePattern(const tstring_view& pattern, DailyRollingFileSchedule&
         i += len;
     }
 
-    if (!auxilary)
+    if (aux_len == 0)
     {
         if (has_minute)
-            schedule = MINUTELY;
+            schedule = DailyRollingFileSchedule::MINUTELY;
         else if (has_hour)
-            schedule = HOURLY;
+            schedule = DailyRollingFileSchedule::HOURLY;
         else if (has_day)
-            schedule = DAILY;
+            schedule = DailyRollingFileSchedule::DAILY;
         else if (has_week)
-            schedule = WEEKLY;
+            schedule = DailyRollingFileSchedule::WEEKLY;
         else
-            schedule = MONTHLY;
+            schedule = DailyRollingFileSchedule::MONTHLY;
     }
 
     return result.str();
@@ -1279,7 +1275,7 @@ TimeBasedRollingFileAppender::TimeBasedRollingFileAppender(
     bool rollOnClose_)
     : FileAppenderBase(filename_, std::ios_base::app, immediateFlush_, createDirs_)
     , filenamePattern(filenamePattern_)
-    , schedule(DAILY)
+    , schedule(DailyRollingFileSchedule::DAILY)
     , maxHistory(maxHistory_)
     , cleanHistoryOnStart(cleanHistoryOnStart_)
     , rollOnClose(rollOnClose_)
@@ -1292,7 +1288,7 @@ TimeBasedRollingFileAppender::TimeBasedRollingFileAppender(
     const log4cplus::helpers::Properties& properties)
     : FileAppenderBase(properties, std::ios_base::app)
     , filenamePattern(LOG4CPLUS_TEXT("%d.log"))
-    , schedule(DAILY)
+    , schedule(DailyRollingFileSchedule::DAILY)
     , maxHistory(10)
     , cleanHistoryOnStart(false)
     , rollOnClose(true)
@@ -1329,9 +1325,13 @@ TimeBasedRollingFileAppender::init()
     Time now = helpers::now();
     nextRolloverTime = calculateNextRolloverTime(now);
 
-    if (cleanHistoryOnStart)
+    if (cleanHistoryOnStart) [[unlikely]]
     {
         clean(now + maxHistory*getRolloverPeriodDuration());
+    }
+    else
+    {
+        clean(now);
     }
 
     lastHeartBeat = now;
@@ -1351,12 +1351,15 @@ void
 TimeBasedRollingFileAppender::open(std::ios_base::openmode mode)
 {
     scheduledFilename = helpers::getFormattedTime(filenamePattern, helpers::now(), false);
-    tstring currentFilename = filename.empty() ? scheduledFilename : filename;
+    if (filename.empty())
+        filename = scheduledFilename;
+
+    tstring currentFilename = filename;
 
     if (createDirs)
         internal::make_dirs (currentFilename);
 
-    out.open(LOG4CPLUS_FSTREAM_PREFERED_FILE_NAME(currentFilename).c_str(), mode);
+    out.open(std::filesystem::path (currentFilename), mode);
     if(!out.good())
     {
         getErrorHandler()->error(LOG4CPLUS_TEXT("Unable to open file: ") + currentFilename);
@@ -1396,7 +1399,7 @@ TimeBasedRollingFileAppender::rollover(bool alreadyLocked)
     // should remain unchanged on a close
     out.clear();
 
-    if (! filename.empty())
+    if (filename != scheduledFilename)
     {
         helpers::LogLog & loglog = helpers::getLogLog();
         long ret;
@@ -1454,20 +1457,20 @@ TimeBasedRollingFileAppender::getRolloverPeriodDuration() const
 {
     switch (schedule)
     {
-    case MONTHLY:
+    case DailyRollingFileSchedule::MONTHLY:
         return std::chrono::hours{31*24};
-    case WEEKLY:
+    case DailyRollingFileSchedule::WEEKLY:
         return std::chrono::hours{7*24};
     default:
         helpers::getLogLog ().error (
             LOG4CPLUS_TEXT ("TimeBasedRollingFileAppender::getRolloverPeriodDuration()-")
             LOG4CPLUS_TEXT (" invalid schedule value"));
         [[fallthrough]];
-    case DAILY:
+    case DailyRollingFileSchedule::DAILY:
         return std::chrono::hours{24};
-    case HOURLY:
+    case DailyRollingFileSchedule::HOURLY:
         return std::chrono::hours{1};
-    case MINUTELY:
+    case DailyRollingFileSchedule::MINUTELY:
         return std::chrono::minutes{1};
     }
 }
@@ -1490,7 +1493,7 @@ CATCH_TEST_CASE ("TimeBasedRollingFileAppender", "[appender]")
         CATCH_REQUIRE (preprocessDateTimePattern(
             LOG4CPLUS_TEXT ("yyyy-MM-dd"), schedule)
             == LOG4CPLUS_TEXT ("%Y-%m-%d"));
-        CATCH_REQUIRE (schedule == DAILY);
+        CATCH_REQUIRE (schedule == DailyRollingFileSchedule::DAILY);
     }
 
     CATCH_SECTION ("file name pattern preprocessing")
@@ -1499,7 +1502,7 @@ CATCH_TEST_CASE ("TimeBasedRollingFileAppender", "[appender]")
         CATCH_REQUIRE (preprocessFilenamePattern(
             LOG4CPLUS_TEXT ("log-%d{yyyy-MM-dd}"), schedule)
             == LOG4CPLUS_TEXT ("log-%Y-%m-%d"));
-        CATCH_REQUIRE (schedule == DAILY);
+        CATCH_REQUIRE (schedule == DailyRollingFileSchedule::DAILY);
     }
 
 }

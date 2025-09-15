@@ -29,6 +29,7 @@
 #include <log4cplus/internal/env.h>
 #include <limits>
 #include <cstdlib>
+#include <memory>
 
 
 namespace
@@ -96,7 +97,7 @@ class PatternConverter
 {
 public:
     explicit PatternConverter(const FormattingInfo& info);
-    virtual ~PatternConverter() {}
+    virtual ~PatternConverter() = default;
     void formatAndAppend(tostream& output,
         const spi::InternalLoggingEvent& event);
 
@@ -111,8 +112,7 @@ private:
 };
 
 
-typedef std::vector<std::unique_ptr<pattern::PatternConverter> >
-PatternConverterList;
+using PatternConverterList = std::vector<std::unique_ptr<pattern::PatternConverter> >;
 
 
 /**
@@ -123,8 +123,8 @@ class LiteralPatternConverter : public PatternConverter
 public:
     LiteralPatternConverter();
     explicit LiteralPatternConverter(const tstring& str);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent&)
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent&) override
     {
         result = str;
     }
@@ -155,13 +155,13 @@ public:
                 FULL_LOCATION_CONVERTER,
                 FUNCTION_CONVERTER };
     BasicPatternConverter(const FormattingInfo& info, Type type);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
   // Disable copy
-    BasicPatternConverter(const BasicPatternConverter&);
-    BasicPatternConverter& operator=(BasicPatternConverter&);
+    BasicPatternConverter(const BasicPatternConverter&) = delete;
+    BasicPatternConverter& operator=(BasicPatternConverter&) = delete;
 
     LogLevelManager& llmCache;
     Type type;
@@ -176,8 +176,8 @@ private:
 class LoggerPatternConverter : public PatternConverter {
 public:
     LoggerPatternConverter(const FormattingInfo& info, int precision);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
     int precision;
@@ -195,8 +195,8 @@ public:
     DatePatternConverter(const FormattingInfo& info,
                          const tstring& pattern,
                          bool use_gmtime);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
     bool use_gmtime;
@@ -211,20 +211,20 @@ class EnvPatternConverter : public PatternConverter {
 public:
     EnvPatternConverter(const FormattingInfo& info,
                         const log4cplus::tstring& env);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
     log4cplus::tstring envKey;
 };
 
 
-//! This pattern is used to format miliseconds since process start.
+//! This pattern is used to format milliseconds since process start.
 class RelativeTimestampConverter: public PatternConverter {
 public:
-    RelativeTimestampConverter(const FormattingInfo& info);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    explicit RelativeTimestampConverter(const FormattingInfo& info);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 };
 
 
@@ -234,8 +234,8 @@ public:
 class HostnamePatternConverter : public PatternConverter {
 public:
     HostnamePatternConverter(const FormattingInfo& info, bool fqdn);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
     tstring hostname_;
@@ -252,8 +252,8 @@ class MDCPatternConverter
 {
 public:
     MDCPatternConverter(const FormattingInfo& info, tstring const & k);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
     tstring key;
@@ -268,8 +268,8 @@ private:
 class NDCPatternConverter : public PatternConverter {
 public:
     NDCPatternConverter(const FormattingInfo& info, int precision);
-    virtual void convert(tstring & result,
-        const spi::InternalLoggingEvent& event);
+    void convert(tstring & result,
+        const spi::InternalLoggingEvent& event) override;
 
 private:
     int precision;
@@ -391,7 +391,6 @@ PatternConverter::formatAndAppend(
 
 LiteralPatternConverter::LiteralPatternConverter()
     : PatternConverter(FormattingInfo())
-    , str()
 { }
 
 
@@ -517,7 +516,7 @@ LoggerPatternConverter::convert(tstring & result,
     else {
         auto len = name.length();
 
-        // We substract 1 from 'len' when assigning to 'end' to avoid out of
+        // We subtract 1 from 'len' when assigning to 'end' to avoid out of
         // bounds exception in return r.substring(end+1, len). This can happen
         // if precision is 1 and the logger name ends with a dot.
         auto end = len - 1;
@@ -611,7 +610,7 @@ RelativeTimestampConverter::convert (tstring & result,
 HostnamePatternConverter::HostnamePatternConverter (
     const FormattingInfo& info, bool fqdn)
     : PatternConverter(info)
-    , hostname_ (helpers::getHostname (fqdn))
+    , hostname_ (helpers::getHostname (fqdn).value_or (LOG4CPLUS_C_STR_TO_TSTRING ("-")))
 { }
 
 
@@ -648,11 +647,8 @@ log4cplus::pattern::MDCPatternConverter::convert (tstring & result,
         result.clear ();
 
         MappedDiagnosticContextMap const & mdcMap = event.getMDCCopy();
-        for (auto const & kv : mdcMap)
+        for (auto const & [name, value] : mdcMap)
         {
-            tstring const & name = kv.first;
-            tstring const & value = kv.second;
-
             result += LOG4CPLUS_TEXT("{");
             result += name;
             result += LOG4CPLUS_TEXT(", ");
@@ -717,8 +713,7 @@ PatternParser::extractOption()
     if (   (pos < pattern.length())
         && (pattern[pos] == LOG4CPLUS_TEXT('{')))
     {
-        tstring::size_type end = pattern.find_first_of(LOG4CPLUS_TEXT('}'), pos);
-        if (end != tstring::npos) {
+        if (auto end = pattern.find_first_of(LOG4CPLUS_TEXT('}'), pos); end != tstring::npos) {
             r.assign (pattern, pos + 1, end - pos - 1);
             pos = end + 1;
             return r;
@@ -772,9 +767,8 @@ PatternParser::parse()
                     break;
                 default:
                     if(! currentLiteral.empty ()) {
-                        list.push_back
-                            (std::unique_ptr<PatternConverter>(
-                                new LiteralPatternConverter(currentLiteral)));
+                        list.emplace_back (
+                            new LiteralPatternConverter(currentLiteral));
                         //getLogLog().debug("Parsed LITERAL converter: \""
                         //                  +currentLiteral+"\".");
                     }
@@ -832,7 +826,7 @@ PatternParser::parse()
             }
             else {
                 tostringstream buf;
-                buf << LOG4CPLUS_TEXT("Error occured in position ")
+                buf << LOG4CPLUS_TEXT("Error occurred in position ")
                     << pos
                     << LOG4CPLUS_TEXT(".\n Was expecting digit, instead got char \"")
                     << c
@@ -855,9 +849,7 @@ PatternParser::parse()
     } // end while
 
     if(! currentLiteral.empty ()) {
-        list.push_back(
-            std::unique_ptr<PatternConverter>(
-                new LiteralPatternConverter(currentLiteral)));
+        list.emplace_back(new LiteralPatternConverter(currentLiteral));
       //getLogLog().debug("Parsed LITERAL converter: \""+currentLiteral+"\".");
     }
 
@@ -1027,7 +1019,7 @@ PatternParser::finalizeConverter(tchar c)
             pc = new LiteralPatternConverter(currentLiteral);
     }
 
-    list.push_back(std::unique_ptr<PatternConverter>(pc));
+    list.emplace_back(pc);
     currentLiteral.resize(0);
     state = LITERAL_STATE;
     formattingInfo.reset();
@@ -1037,7 +1029,7 @@ PatternParser::finalizeConverter(tchar c)
 } // namespace pattern
 
 
-typedef pattern::PatternConverterList PatternConverterList;
+using PatternConverterList = pattern::PatternConverterList;
 
 
 ////////////////////////////////////////////////
@@ -1095,7 +1087,7 @@ PatternLayout::init(const tstring& pattern_, unsigned ndcMaxDepth)
         {
             helpers::getLogLog().error(
                 LOG4CPLUS_TEXT("Parsed Pattern created a NULL PatternConverter"));
-            pc.reset (new pattern::LiteralPatternConverter);
+            pc = std::make_unique<pattern::LiteralPatternConverter> ();
         }
     }
 
@@ -1103,17 +1095,15 @@ PatternLayout::init(const tstring& pattern_, unsigned ndcMaxDepth)
     {
         helpers::getLogLog().warn(
             LOG4CPLUS_TEXT("PatternLayout pattern is empty.  Using default..."));
-        parsedPattern.push_back (
-            std::unique_ptr<pattern::PatternConverter>(
+        parsedPattern.emplace_back (
                 new pattern::BasicPatternConverter(pattern::FormattingInfo(),
-                    pattern::BasicPatternConverter::MESSAGE_CONVERTER)));
+                    pattern::BasicPatternConverter::MESSAGE_CONVERTER));
     }
 }
 
 
 
-PatternLayout::~PatternLayout()
-{ }
+PatternLayout::~PatternLayout() = default;
 
 
 

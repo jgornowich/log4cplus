@@ -73,7 +73,7 @@
 #endif
 
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 // from lockfile.cxx
 LOG4CPLUS_PRIVATE bool trySetCloseOnExec (int fd);
@@ -185,7 +185,7 @@ openSocket(tstring const & host, unsigned short port, bool udp, bool ipv6,
     if (::listen(sock_holder.sock, 10))
         return INVALID_SOCKET_VALUE;
 
-    state = ok;
+    state = SocketState::ok;
     return to_log4cplus_socket (sock_holder.detach ());
 }
 
@@ -243,7 +243,7 @@ connectSocket(const tstring& hostn, unsigned short port, bool udp, bool ipv6,
         // No address succeeded.
         return INVALID_SOCKET_VALUE;
 
-    state = ok;
+    state = SocketState::ok;
     return to_log4cplus_socket (sock_holder.detach ());
 }
 
@@ -255,14 +255,14 @@ namespace
 template <typename T, typename U>
 struct socklen_var
 {
-    typedef T type;
+    using type = T;
 };
 
 
 template <typename U>
 struct socklen_var<void, U>
 {
-    typedef U type;
+    using type = U;
 };
 
 
@@ -278,11 +278,37 @@ accept_wrap (
 {
     typedef typename socklen_var<accept_socklen_type, socklen_t>::type
         socklen_var_type;
-    socklen_var_type l = static_cast<socklen_var_type>(*len);
-    SOCKET_TYPE result
+    auto l = static_cast<socklen_var_type>(*len);
+    auto result
         = static_cast<SOCKET_TYPE>(
             accept_func (sock, sa,
                 reinterpret_cast<accept_socklen_type *>(&l)));
+    *len = static_cast<socklen_t>(l);
+    return result;
+}
+
+// Overload for `accept4()`.
+template <typename accept_sockaddr_ptr_type, typename accept_socklen_type>
+static
+SOCKET_TYPE
+accept_wrap (
+    int (* accept_func) (int, accept_sockaddr_ptr_type, accept_socklen_type *,
+        int),
+    SOCKET_TYPE sock, struct sockaddr * sa, socklen_t * len)
+{
+    typedef typename socklen_var<accept_socklen_type, socklen_t>::type
+        socklen_var_type;
+    auto l = static_cast<socklen_var_type>(*len);
+    auto result
+        = static_cast<SOCKET_TYPE>(
+            accept_func (sock, sa,
+                reinterpret_cast<accept_socklen_type *>(&l),
+#if defined (SOCK_CLOEXEC)
+                SOCK_CLOEXEC
+#else
+                0
+#endif
+                ));
     *len = static_cast<socklen_t>(l);
     return result;
 }
@@ -299,14 +325,20 @@ acceptSocket(SOCKET_TYPE sock, SocketState& state)
     int clientSock;
 
     while(
-        (clientSock = accept_wrap (accept, to_os_socket (sock),
+        (clientSock = accept_wrap (
+#if defined (LOG4CPLUS_HAVE_ACCEPT4)
+            accept4
+#else
+            accept
+#endif
+            , to_os_socket (sock),
             reinterpret_cast<struct sockaddr*>(&net_client), &len))
         == -1
         && (errno == EINTR))
         ;
 
     if(clientSock != INVALID_OS_SOCKET_VALUE) {
-        state = ok;
+        state = SocketState::ok;
     }
 
     return to_log4cplus_socket (clientSock);
@@ -333,16 +365,18 @@ read(SOCKET_TYPE sock, SocketBuffer& buffer)
 {
     long readbytes = 0;
 
+    char * const buf = buffer.getBuffer ();
+    std::size_t const buf_max_size = buffer.getMaxSize ();
     do
     {
         long const res = ::read(to_os_socket (sock),
-            buffer.getBuffer() + readbytes,
-            buffer.getMaxSize() - readbytes);
+            buf + readbytes,
+            buf_max_size - readbytes);
         if( res <= 0 ) {
             return res;
         }
         readbytes += res;
-    } while( readbytes < static_cast<long>(buffer.getMaxSize()) );
+    } while( readbytes < static_cast<long>(buf_max_size) );
 
     return readbytes;
 }
@@ -410,10 +444,10 @@ write(SOCKET_TYPE sock, const std::string & buffer)
 }
 
 
-tstring
+std::optional<tstring>
 getHostname (bool fqdn)
 {
-    char const * hostname = "unknown";
+    char const * hostname = nullptr;
     int ret;
     std::vector<char> hn (1024, 0);
 
@@ -425,24 +459,30 @@ getHostname (bool fqdn)
             hostname = &hn[0];
             break;
         }
+        else if (false
 #if defined (LOG4CPLUS_HAVE_ENAMETOOLONG)
-        else if (errno == ENAMETOOLONG)
+                 || errno == ENAMETOOLONG
+#endif
+#if defined (__GLIBC__) || defined (__GNU_LIBRARY__)
+                 // Before version 2.1, glibc uses EINVAL for this case.
+                 || errno == EINVAL
+#endif
+        )
             // Out buffer was too short. Retry with buffer twice the size.
             hn.resize (hn.size () * 2, 0);
-#endif
         else
-            break;
+            return { };
     }
 
-    if (ret != 0 || (ret == 0 && ! fqdn))
-        return LOG4CPLUS_STRING_TO_TSTRING (hostname);
+    if (! fqdn)
+        return { LOG4CPLUS_C_STR_TO_TSTRING (hostname) };
 
     std::string full_hostname;
     ret = get_host_by_name (hostname, &full_hostname, nullptr);
     if (ret == 0)
-        hostname = full_hostname.c_str ();
+        return { LOG4CPLUS_STRING_TO_TSTRING (full_hostname) };
 
-    return LOG4CPLUS_STRING_TO_TSTRING (hostname);
+    return { LOG4CPLUS_C_STR_TO_TSTRING (hostname) };
 }
 
 
@@ -516,7 +556,7 @@ ServerSocket::ServerSocket(unsigned short port, bool udp /*= false*/,
 
 error:;
     err = get_last_socket_error ();
-    state = not_opened;
+    state = SocketState::not_opened;
 
     if (sock != INVALID_SOCKET_VALUE)
         closeSocket (sock);
@@ -558,7 +598,7 @@ ServerSocket::accept ()
                 continue;
 
             set_last_socket_error (errno);
-            return Socket (INVALID_SOCKET_VALUE, not_opened, errno);
+            return Socket (INVALID_SOCKET_VALUE, SocketState::not_opened, errno);
 
         // Timeout. This should not happen though.
         case 0:
@@ -584,12 +624,14 @@ ServerSocket::accept ()
                         LOG4CPLUS_TEXT ("ServerSocket::accept- read() failed: ")
                         + helpers::convertIntegerToString (eno));
                     set_last_socket_error (eno);
-                    return Socket (INVALID_SOCKET_VALUE, not_opened, eno);
+                    return Socket (INVALID_SOCKET_VALUE,
+                        SocketState::not_opened, eno);
                 }
 
                 // Return Socket with state set to accept_interrupted.
 
-                return Socket (INVALID_SOCKET_VALUE, accept_interrupted, 0);
+                return Socket (INVALID_SOCKET_VALUE,
+                    SocketState::accept_interrupted, 0);
             }
             else if ((accept_fd.revents & POLLIN) == POLLIN)
             {
@@ -597,7 +639,7 @@ ServerSocket::accept ()
                     LOG4CPLUS_TEXT ("ServerSocket::accept- ")
                     LOG4CPLUS_TEXT ("accepting connection"));
 
-                SocketState st = not_opened;
+                SocketState st = SocketState::not_opened;
                 SOCKET_TYPE clientSock = acceptSocket (sock, st);
                 int eno = 0;
                 if (clientSock == INVALID_SOCKET_VALUE)
@@ -606,7 +648,8 @@ ServerSocket::accept ()
                 return Socket (clientSock, st, eno);
             }
             else
-                return Socket (INVALID_SOCKET_VALUE, not_opened, 0);
+                return Socket (INVALID_SOCKET_VALUE, SocketState::not_opened,
+                    0);
         }
     }
     while (true);
@@ -644,6 +687,6 @@ ServerSocket::~ServerSocket()
         ::close (interruptHandles[1]);
 }
 
-} } // namespace log4cplus
+} // namespace log4cplus
 
 #endif // LOG4CPLUS_USE_BSD_SOCKETS

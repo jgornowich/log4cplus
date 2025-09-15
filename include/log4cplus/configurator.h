@@ -90,6 +90,7 @@ namespace log4cplus
 #if defined (LOG4CPLUS_HAVE_CODECVT_UTF32_FACET) && defined (UNICODE)
             , fUTF32              = (3 << fEncodingShift)
 #endif
+            , fThrow              = (1 << 5)
         };
 
         // ctor and dtor
@@ -135,7 +136,7 @@ namespace log4cplus
          * # Set appender specific options.
          * log4cplus.appender.appenderName.option1=value1
          * ...
-         * log4cplus.appender.appenderName.optionN=valueN
+         * log4cplus.appender.appenderName.option&lt;N&gt;=value&lt;N&gt;
          * </pre>
          *
          * For each named appender you can configure its {@link Layout}. The
@@ -144,7 +145,7 @@ namespace log4cplus
          * log4cplus.appender.appenderName.layout=fully.qualified.name.of.layout.class
          * log4cplus.appender.appenderName.layout.option1=value1
          * ....
-         * log4cplus.appender.appenderName.layout.optionN=valueN
+         * log4cplus.appender.appenderName.layout.option&lt;N&gt;=value&lt;N&gt;
          * </pre>
          *
          * <h3>Configuring loggers</h3>
@@ -199,8 +200,18 @@ namespace log4cplus
          *
          * <h3>Global configuration</h3>
          *
-         * Property <pre>log4cplus.threadPoolSize</pre> can be used to adjust
-         * size of log4cplus' internal thread pool.
+         * <ul>
+         * <li>Property <pre>log4cplus.threadPoolSize</pre> can be used to adjust
+         * size of log4cplus' internal thread pool.</li>
+         * <li>Property <pre>log4cplus.threadPoolBlockOnFull</pre> can be
+         * used to change behaviour of the thread pool when its queue is full.
+         * The default value is <pre>true</pre>, to block the thread until
+         * there is a space in the queue. Setting this property to
+         * <pre>false</pre> makes the thread pool not to block when it is full.
+         * The items that could not be inserted are dropped instead.</li>
+         * <li>Property <pre>log4cplus.threadPoolQueueSizeLimit</pre> can be used to
+         * set thread pool queue size limit.</li>
+         * </ul>
          *
          * <h3>Example</h3>
          *
@@ -221,7 +232,7 @@ namespace log4cplus
          * # milliseconds, followed by the LogLevel of the log request,
          * # followed by the two rightmost components of the logger name,
          * # followed by the callers method name, followed by the line number,
-         * # the nested disgnostic context and finally the message itself.
+         * # the nested diagnostic context and finally the message itself.
          * # Refer to the documentation of {@link PatternLayout} for further information
          * # on the syntax of the ConversionPattern key.
          * log4cplus.appender.A1.layout=log4cplus::PatternLayout
@@ -257,9 +268,6 @@ namespace log4cplus
          * # logger, A2 in this case.
          * log4cplus.logger.class.of.the.day=INHERIT
          * </pre>
-         *
-         * Refer to the <b>setOption</b> method in each Appender and
-         * Layout for class specific options.
          *
          * Use the <code>#</code> character at the beginning of a line
          * for comments.

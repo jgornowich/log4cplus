@@ -40,15 +40,16 @@
 #endif
 
 #if defined (LOG4CPLUS_WITH_UNIT_TESTS)
-#include <catch.hpp>
+#include <catch_amalgamated.hpp>
 #endif
 
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 
 std::size_t const START_BUF_SIZE = 512;
 
+[[maybe_unused]]
 #if defined (_WIN32)
 char const NULL_FILE[] = "NUL";
 #else
@@ -162,7 +163,7 @@ vsntprintf (tchar * dest, std::size_t dest_size, tchar const * fmt,
 #endif
 
 
-}
+} // namespace
 
 
 snprintf_buf::snprintf_buf ()
@@ -212,7 +213,10 @@ snprintf_buf::print_va_list (tchar const * & str, tchar const * fmt,
                 LOG4CPLUS_TEXT ("Could not open NULL_FILE."), true);
     }
 
-    printed = vftprintf (fnull, fmt, args);
+    std::va_list args_copy;
+    va_copy (args_copy, args);
+    printed = vftprintf (fnull, fmt, args_copy);
+    va_end (args_copy);
     if (printed == -1)
         LogLog::getLogLog ()->error (
             LOG4CPLUS_TEXT ("Error printing into NULL_FILE."), true);
@@ -282,4 +286,4 @@ CATCH_TEST_CASE ("snprintf_buf", "[snprintf_buf]")
 #endif
 
 
-} } // namespace log4cplus { namespace helpers
+} // namespace log4cplus::helpers

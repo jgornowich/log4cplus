@@ -44,18 +44,59 @@
 
 #define LOG4CPLUS_THROW_RTE(msg) \
     do { log4cplus::thread::impl::syncprims_throw_exception (msg, __FILE__, \
-            __LINE__); } while (0)
+            __LINE__); } while (false)
 
 namespace log4cplus { namespace thread {
 
 namespace impl
 {
 
-LOG4CPLUS_EXPORT void LOG4CPLUS_ATTRIBUTE_NORETURN
-    syncprims_throw_exception(char const * const msg,
-    char const * const file, int line);
+LOG4CPLUS_EXPORT void syncprims_throw_exception [[noreturn]] (
+    char const * const msg, char const * const file, int line);
 
 }
+
+//
+//
+//
+
+LOG4CPLUS_INLINE_EXPORT
+SimpleMutex::SimpleMutex ()
+    LOG4CPLUS_THREADED (: mtx ())
+{ }
+
+
+LOG4CPLUS_INLINE_EXPORT
+SimpleMutex::~SimpleMutex ()
+{ }
+
+
+LOG4CPLUS_INLINE_EXPORT
+void
+SimpleMutex::lock () const
+{
+    LOG4CPLUS_THREADED (mtx.lock ());
+}
+
+LOG4CPLUS_INLINE_EXPORT
+bool
+SimpleMutex::try_lock () const
+{
+#if defined (LOG4CPLUS_SINGLE_THREADED)
+    return true;
+#else
+    return mtx.try_lock ();
+#endif
+}
+
+
+LOG4CPLUS_INLINE_EXPORT
+void
+SimpleMutex::unlock () const
+{
+    LOG4CPLUS_THREADED (mtx.unlock ());
+}
+
 
 //
 //
@@ -130,7 +171,7 @@ Semaphore::lock () const
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
     std::unique_lock<std::mutex> guard (mtx);
 
-    if (LOG4CPLUS_UNLIKELY(val > max_))
+    if (val > max_) [[unlikely]]
         LOG4CPLUS_THROW_RTE ("Semaphore::unlock(): val > max");
 
     while (val == 0)
@@ -138,7 +179,7 @@ Semaphore::lock () const
 
     --val;
 
-    if (LOG4CPLUS_UNLIKELY(val >= max_))
+    if (val >= max_) [[unlikely]]
         LOG4CPLUS_THROW_RTE ("Semaphore::unlock(): val >= max");
 #endif
 }

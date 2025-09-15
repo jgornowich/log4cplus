@@ -64,29 +64,23 @@ loglog_win32_error (tchar const * msg)
     helpers::getLogLog ().error (oss.str ());
 }
 
-}
+} // namespace
 
 
 struct CLFSAppender::Data
 {
-    Data ()
-        : log_name ()
-        , log_handle (INVALID_HANDLE_VALUE)
-        , buffer (0)
-        , buffer_size (0)
-    { }
+    Data () = default;
 
     tstring log_name;
-    HANDLE log_handle;
-    void * buffer;
-    ULONG buffer_size;
+    HANDLE log_handle{INVALID_HANDLE_VALUE};
+    void * buffer{nullptr};
+    ULONG buffer_size{0};
 };
 
 
 CLFSAppender::CLFSAppender (tstring const & logname, unsigned long logsize,
     unsigned long buffersize)
-    : Appender ()
-    , data (new Data)
+    : data (new Data)
 {
     init (logname, logsize, buffersize);
 }
@@ -96,7 +90,7 @@ CLFSAppender::CLFSAppender (helpers::Properties const & props)
     : Appender (props)
     , data (new Data)
 {
-    tstring logname = props.getProperty (LOG4CPLUS_TEXT ("LogName"));
+    const tstring& logname = props.getProperty (LOG4CPLUS_TEXT ("LogName"));
 
     unsigned long logsize = CLFS_APPENDER_INITIAL_LOG_SIZE;
     props.getULong (logsize, LOG4CPLUS_TEXT ("LogSize"));

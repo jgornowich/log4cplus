@@ -24,7 +24,7 @@
 // Include full Windows.h early for Catch.
 #  include <log4cplus/config/windowsh-inc-full.h>
 #  define CATCH_CONFIG_RUNNER
-#  include <catch.hpp>
+#  include <catch_amalgamated.hpp>
 #endif
 
 #include <log4cplus/initializer.h>
@@ -32,6 +32,7 @@
 #include <log4cplus/logger.h>
 #include <log4cplus/ndc.h>
 #include <log4cplus/mdc.h>
+#include <log4cplus/helpers/eventcounter.h>
 #include <log4cplus/helpers/loglog.h>
 #include <log4cplus/internal/customloglevelmanager.h>
 #include <log4cplus/internal/internal.h>
@@ -46,6 +47,7 @@
 #include <cstdio>
 #include <iostream>
 #include <stdexcept>
+#include <chrono>
 
 
 // Forward Declarations
@@ -137,9 +139,36 @@ std::unique_ptr<progschj::ThreadPool>
 instantiate_thread_pool ()
 {
     log4cplus::thread::SignalsBlocker sb;
+#if defined (LOG4CPLUS_ENABLE_THREAD_POOL)
     return std::unique_ptr<progschj::ThreadPool>(new progschj::ThreadPool (4));
+#else
+    return std::unique_ptr<progschj::ThreadPool>();
+#endif
 }
 #endif
+
+
+//! Helper structure for holding progschj::ThreadPool pointer.
+//! It is necessary to have this so that we can correctly order
+//! destructors between Hierarchy and the progschj::ThreadPool.
+//! Hierarchy wants to wait for outstading logging to finish
+//! therefore the ThreadPool can only be destroyed after that.
+struct ThreadPoolHolder
+{
+#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+    std::atomic<progschj::ThreadPool*> thread_pool{};
+#endif
+
+    ThreadPoolHolder () = default;
+    ThreadPoolHolder (ThreadPoolHolder const&) = delete;
+    ~ThreadPoolHolder ()
+    {
+#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+        auto const tp = thread_pool.exchange(nullptr, std::memory_order_release);
+        delete tp;
+#endif
+    }
+};
 
 
 //! Default context.
@@ -156,10 +185,35 @@ struct DefaultContext
     spi::LayoutFactoryRegistry layout_factory_registry;
     spi::FilterFactoryRegistry filter_factory_registry;
     spi::LocaleFactoryRegistry locale_factory_registry;
-#if ! defined (LOG4CPLUS_SINGLE_THREADED)
-    std::unique_ptr<progschj::ThreadPool> thread_pool {instantiate_thread_pool ()};
-#endif
     Hierarchy hierarchy;
+    ThreadPoolHolder thread_pool;
+    std::atomic<bool> block_on_full {true};
+
+#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+    progschj::ThreadPool *
+    get_thread_pool (bool init)
+    {
+        if (init) {
+            std::call_once (thread_pool_once, [&] {
+                thread_pool.thread_pool.store (instantiate_thread_pool ().release (), std::memory_order_release);
+            });
+        }
+        // cppreference.com says: The specification of release-consume ordering
+        // is being revised, and the use of memory_order_consume is temporarily
+        // discouraged. Thus, let's use memory_order_acquire.
+        return thread_pool.thread_pool.load (std::memory_order_acquire);
+    }
+
+    void
+    shutdown_thread_pool ()
+    {
+        auto const tp = thread_pool.thread_pool.exchange(nullptr, std::memory_order_release);
+        delete tp;
+    }
+
+private:
+    std::once_flag thread_pool_once;
+#endif
 };
 
 
@@ -215,9 +269,15 @@ alloc_dc ()
 
 static
 DefaultContext *
-get_dc (bool alloc = true)
+get_dc (
+#ifdef LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION
+  bool alloc = false
+#else
+  bool alloc = true
+#endif
+)
 {
-    if (LOG4CPLUS_UNLIKELY(!default_context))
+    if (!default_context) [[unlikely]]
     {
         if (alloc)
         {
@@ -305,16 +365,47 @@ getMDC ()
 }
 
 
-#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+#if ! defined (LOG4CPLUS_SINGLE_THREADED) \
+    && defined (LOG4CPLUS_ENABLE_THREAD_POOL)
 void
 enqueueAsyncDoAppend (SharedAppenderPtr const & appender,
     spi::InternalLoggingEvent const & event)
 {
-    get_dc ()->thread_pool->enqueue (
-        [=] ()
+    static helpers::SteadyClockGate gate (helpers::SteadyClockGate::Duration {std::chrono::minutes (5)});
+
+    DefaultContext * dc = get_dc ();
+    progschj::ThreadPool * tp = dc->get_thread_pool (true);
+    auto func = [=] () {
+        appender->asyncDoAppend (event);
+    };
+    if (dc->block_on_full)
+        tp->enqueue_block (std::move (func));
+    else
+    {
+        std::future<void> future = tp->enqueue (std::move (func));
+        if (future.wait_for (std::chrono::seconds (0)) == std::future_status::ready)
         {
-            appender->asyncDoAppend (event);
-        });
+            try
+            {
+                future.get ();
+            }
+            catch (const progschj::would_block &)
+            {
+                gate.record_event ();
+                helpers::SteadyClockGate::Info info;
+                if (gate.latch_open (info))
+                {
+                    helpers::LogLog & loglog = helpers::getLogLog ();
+                    log4cplus::tostringstream oss;
+                    oss << LOG4CPLUS_TEXT ("Asynchronous logging queue is full. Dropped ")
+                        << info.count << LOG4CPLUS_TEXT (" events in last ")
+                        << std::chrono::duration_cast<std::chrono::seconds> (info.time_span).count ()
+                        << LOG4CPLUS_TEXT (" seconds");
+                    loglog.warn (oss.str ());
+                }
+            }
+        }
+    }
 }
 
 #endif
@@ -324,9 +415,9 @@ shutdownThreadPool ()
 {
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
     DefaultContext * const dc = get_dc (false);
-    if (dc && dc->thread_pool)
+    if (dc)
     {
-        dc->thread_pool.reset ();
+        dc->shutdown_thread_pool ();
     }
 #endif
 }
@@ -337,10 +428,11 @@ waitUntilEmptyThreadPoolQueue ()
 {
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
     DefaultContext * const dc = get_dc (false);
-    if (dc && dc->thread_pool)
+    progschj::ThreadPool * tp;
+    if (dc && (tp = dc->get_thread_pool (false)))
     {
-        dc->thread_pool->wait_until_empty ();
-        dc->thread_pool->wait_until_nothing_in_flight ();
+        tp->wait_until_empty ();
+        tp->wait_until_nothing_in_flight ();
     }
 #endif
 }
@@ -392,16 +484,13 @@ gft_scratch_pad::gft_scratch_pad ()
 { }
 
 
-gft_scratch_pad::~gft_scratch_pad ()
-{ }
+gft_scratch_pad::~gft_scratch_pad () = default;
 
 
-appender_sratch_pad::appender_sratch_pad ()
-{ }
+appender_sratch_pad::appender_sratch_pad () = default;
 
 
-appender_sratch_pad::~appender_sratch_pad ()
-{ }
+appender_sratch_pad::~appender_sratch_pad () = default;
 
 
 per_thread_data::per_thread_data ()
@@ -468,7 +557,7 @@ void
 #endif
 ptd_cleanup_func (void * arg)
 {
-    internal::per_thread_data * const arg_ptd
+    auto * const arg_ptd
         = static_cast<internal::per_thread_data *>(arg);
     internal::per_thread_data * const ptd = internal::get_ptd (false);
     (void) ptd;
@@ -547,8 +636,8 @@ initialize ()
 void
 deinitialize ()
 {
-    shutdownThreadPool();
     Logger::shutdown ();
+    shutdownThreadPool();
 }
 
 
@@ -563,7 +652,7 @@ threadCleanup ()
     //
     // This function can be called from TLS initializer/terminator by loader
     // when log4cplus is compiled and linked to as a static library. In case of
-    // other threads temination, it should do its job and free per-thread
+    // other threads termination, it should do its job and free per-thread
     // data. However, when the whole process is being terminated, it is called
     // after the CRT has been uninitialized and the CRT heap is not available
     // any more. In such case, instead of crashing, we just give up and leak
@@ -571,23 +660,26 @@ threadCleanup ()
     //
     // It is possible to work around this situation in user application by
     // calling `threadCleanup()` manually before `main()` exits.
-#if defined (_WIN32)
-    if (_get_heap_handle() != 0)
+    internal::per_thread_data* ptd = internal::get_ptd(false);
+    if (ptd)
     {
-#endif
-        // Do thread-specific cleanup.
-        internal::per_thread_data * ptd = internal::get_ptd (false);
-        delete ptd;
 #if defined (_WIN32)
-    }
-    else
-    {
-        OutputDebugString (
-            LOG4CPLUS_TEXT ("log4cplus: ")
-            LOG4CPLUS_TEXT ("CRT heap is already gone in threadCleanup()\n"));
-    }
+        if (_get_heap_handle() != 0)
+        {
 #endif
-    internal::set_ptd (nullptr);
+            // Do thread-specific cleanup.
+            delete ptd;
+#if defined (_WIN32)
+        }
+        else
+        {
+            OutputDebugString(
+                LOG4CPLUS_TEXT("log4cplus: ")
+                LOG4CPLUS_TEXT("CRT heap is already gone in threadCleanup()\n"));
+        }
+#endif
+        internal::set_ptd(nullptr);
+    }
 }
 
 
@@ -595,10 +687,31 @@ void
 setThreadPoolSize (std::size_t LOG4CPLUS_THREADED (pool_size))
 {
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
-    get_dc ()->thread_pool->set_pool_size (pool_size);
+    auto const thread_pool = get_dc ()->get_thread_pool (true);
+    if (thread_pool)
+        thread_pool->set_pool_size (pool_size);
+
 #endif
 }
 
+
+void
+setThreadPoolQueueSizeLimit (std::size_t LOG4CPLUS_THREADED (queue_size_limit))
+{
+#if ! defined (LOG4CPLUS_SINGLE_THREADED)
+    auto const thread_pool = get_dc ()->get_thread_pool (true);
+    if (thread_pool)
+        thread_pool->set_queue_size_limit (queue_size_limit);
+
+#endif
+}
+
+
+void
+setThreadPoolBlockOnFull (bool block)
+{
+    get_dc ()->block_on_full.store (block);
+}
 
 static
 void
@@ -643,11 +756,13 @@ thread_callback (LPVOID /*hinstDLL*/, DWORD fdwReason, LPVOID /*lpReserved*/)
     {
     case DLL_PROCESS_ATTACH:
     {
+#if ! defined (LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
         // We cannot initialize log4cplus directly here. This is because
         // DllMain() is called under loader lock. When we are using C++11
         // threads and synchronization primitives then there is a deadlock
         // somewhere in internals of std::mutex::lock().
         queueLog4cplusInitializationThroughAPC ();
+#endif
         break;
     }
 

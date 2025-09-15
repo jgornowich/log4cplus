@@ -117,13 +117,13 @@ namespace log4cplus
     class LOG4CPLUS_EXPORT FileAppenderBase : public Appender {
     public:
       // Methods
-        virtual void close();
+        virtual void close() override;
 
       //! Redefine default locale for output stream. It may be a good idea to
       //! provide UTF-8 locale in case UNICODE macro is defined.
         virtual std::locale imbue(std::locale const& loc);
 
-      //! \returns Locale imbued in fstream.
+      //! \return Locale imbued in fstream.
         virtual std::locale getloc () const;
 
     protected:
@@ -137,7 +137,7 @@ namespace log4cplus
 
         void init();
 
-        virtual void append(const spi::InternalLoggingEvent& event);
+        virtual void append(const spi::InternalLoggingEvent& event) override;
 
         virtual void open(std::ios_base::openmode mode);
         bool reopen();
@@ -253,7 +253,7 @@ namespace log4cplus
         virtual ~RollingFileAppender();
 
     protected:
-        virtual void append(const spi::InternalLoggingEvent& event);
+        virtual void append(const spi::InternalLoggingEvent& event) override;
         void rollover(bool alreadyLocked = false);
 
       // Data
@@ -269,7 +269,7 @@ namespace log4cplus
         SharedRollingFileAppenderPtr;
 
 
-    enum DailyRollingFileSchedule { MONTHLY, WEEKLY, DAILY,
+    enum class DailyRollingFileSchedule { MONTHLY, WEEKLY, DAILY,
                                     TWICE_DAILY, HOURLY, MINUTELY};
 
     /**
@@ -299,7 +299,7 @@ namespace log4cplus
      *
      * <dt><tt>DatePattern</tt></dt>
      * <dd>This property specifies filename suffix pattern to use for
-     * periodical backups of the logfile. The patern should be in
+     * periodical backups of the logfile. The pattern should be in
      * format supported by {@link log4cplus::helpers::Time::getFormatterTime()}</code>.
      * Please notice that the format of the pattern is similar but not identical
      * to the one used for this option in the corresponding Log4J class.
@@ -312,7 +312,7 @@ namespace log4cplus
     public:
       // Ctors
         DailyRollingFileAppender(const log4cplus::tstring& filename,
-                                 DailyRollingFileSchedule schedule = DAILY,
+                                 DailyRollingFileSchedule schedule = DailyRollingFileSchedule::DAILY,
                                  bool immediateFlush = true,
                                  int maxBackupIndex = 10,
                                  bool createDirs = false,
@@ -324,10 +324,10 @@ namespace log4cplus
         virtual ~DailyRollingFileAppender();
 
       // Methods
-        virtual void close();
+        virtual void close() override;
 
     protected:
-        virtual void append(const spi::InternalLoggingEvent& event);
+        virtual void append(const spi::InternalLoggingEvent& event) override;
         void rollover(bool alreadyLocked = false);
         log4cplus::helpers::Time calculateNextRolloverTime(const log4cplus::helpers::Time& t) const;
         log4cplus::tstring getFilename(const log4cplus::helpers::Time& t) const;
@@ -398,9 +398,9 @@ namespace log4cplus
         ~TimeBasedRollingFileAppender();
 
     protected:
-        void append(const spi::InternalLoggingEvent& event);
-        void open(std::ios_base::openmode mode);
-        void close();
+        virtual void append(const spi::InternalLoggingEvent& event) override;
+        void open(std::ios_base::openmode mode) override;
+        virtual void close() override;
         void rollover(bool alreadyLocked = false);
         void clean(helpers::Time time);
         helpers::Time::duration getRolloverPeriodDuration() const;

@@ -71,6 +71,10 @@ namespace log4cplus
      * <dd>Boolean value specifying whether to use IPv6 (true) or IPv4
      * (false). Default value is false.</dd>
      *
+     * <dt><tt>fqdn</tt></dt>
+     * <dd>Boolean value specifying whether to use FQDN for hostname field.
+     * Default value is true.</dd>
+     *
      * </dl>
      *
      * \note Messages sent to remote syslog using UDP are conforming
@@ -97,18 +101,21 @@ namespace log4cplus
 #endif
         SysLogAppender(const tstring& ident, const tstring & host,
             int port = 514, const tstring & facility = tstring (),
-            RemoteSyslogType remoteSyslogType = RSTUdp, bool ipv6 = false);
+            RemoteSyslogType remoteSyslogType = RSTUdp, bool ipv6 = false, bool fqdn = true);
         SysLogAppender(const log4cplus::helpers::Properties & properties);
+        // Disallow copying of instances of this class
+        SysLogAppender(const SysLogAppender&) = delete;
+        SysLogAppender& operator=(const SysLogAppender&) = delete;
 
       // Dtor
         virtual ~SysLogAppender();
 
       // Methods
-        virtual void close();
+        virtual void close() override;
 
     protected:
         virtual int getSysLogLevel(const LogLevel& ll) const;
-        virtual void append(const spi::InternalLoggingEvent& event);
+        virtual void append(const spi::InternalLoggingEvent& event) override;
 #if defined (LOG4CPLUS_HAVE_SYSLOG_H)
         //! Local syslog (served by `syslog()`) worker function.
         void appendLocal(const spi::InternalLoggingEvent& event);
@@ -137,19 +144,15 @@ namespace log4cplus
         void openSocket ();
 
 #if ! defined (LOG4CPLUS_SINGLE_THREADED)
-        virtual thread::Mutex const & ctcGetAccessMutex () const;
-        virtual helpers::Socket & ctcGetSocket ();
-        virtual helpers::Socket ctcConnect ();
-        virtual void ctcSetConnected ();
+        virtual thread::Mutex const & ctcGetAccessMutex () const override;
+        virtual helpers::Socket & ctcGetSocket () override;
+        virtual helpers::Socket ctcConnect () override;
+        virtual void ctcSetConnected () override;
 
         helpers::SharedObjectPtr<helpers::ConnectorThread> connector;
 #endif
 
     private:
-      // Disallow copying of instances of this class
-        SysLogAppender(const SysLogAppender&);
-        SysLogAppender& operator=(const SysLogAppender&);
-
         std::string identStr;
         tstring hostname;
     };

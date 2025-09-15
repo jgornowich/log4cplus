@@ -5,44 +5,43 @@
 Short Description
 =================
 
-[log4cplus] is a simple to use C++11 logging API providing thread--safe,
+[log4cplus] is a simple to use C++23 logging API providing thread--safe,
 flexible, and arbitrarily granular control over log management and
 configuration.  It is modeled after the Java log4j API.
 
-[log4cplus]: https://sourceforge.net/projects/log4cplus/
+[log4cplus]: https://github.com/log4cplus/log4cplus
 
 
 Latest Project Information
 ==========================
 
-The latest up-to-date information for this project can be found at
-[log4cplus] SourceForge project pages or [log4cplus wiki][4] on
-SourceForge.  Please submit bugs, patches, feature requests, etc.,
-there, or on [GitHub][13].
+The latest up-to-date information for this project can be found on the
+[GitHub][13] project page or the [log4cplus wiki][4]. Please submit bugs,
+patches, feature requests, and so on on [GitHub][13].
 
-[4]: https://sourceforge.net/p/log4cplus/wiki/Home/
+[4]: https://github.com/log4cplus/log4cplus/wiki
 [13]: https://github.com/log4cplus/log4cplus
 
 
 Mission statement
 =================
 
-The aim of this project is to develop log4j--like logging framework
-for use in (primarily) C++. One of the major design goals is to avoid
+The aim of this project is to develop a log4j-like logging framework for
+use primarily in C++. One of the major design goals is to avoid
 huge dependencies (like Boost) in the core functionality and to use
 standard C++ facilities instead. Where possible, the project takes
-inspiration from other logging libraries, beside from log4j (e.g.,
+inspiration from other logging libraries, besides log4j (e.g.,
 from log4net, log4cxx, log4cpp).
 
 
 Platform support
 ================
 
-[log4cplus] version 2.0 and beyond require C++11. [log4cplus] has been
+[log4cplus] version 3.0 and beyond require C++23. [log4cplus] has been
 ported to and tested on the following platforms:
 
-  - Linux/AMD64 with GCC version 6.2.0 20161005 (Ubuntu 6.2.0-5ubuntu12)
-  - Linux/AMD64 with Clang version 3.8.1-12ubuntu1 (tags/RELEASE_381/final)
+  - Linux/AMD64 with GCC version 13.2.0 (Ubuntu 13.2.0-23ubuntu4)
+  - Linux/AMD64 with Clang version 18.1.3 (18.1.3-1ubuntu1)
   - Windows/AMD64 with GCC version 4.8.2 (x86_64-posix-seh-rev3, Built by
     MinGW-W64 project) using CMake build system
   - Windows/AMD64 with GCC version 4.9.2 (tdm64-1) using CMake build system
@@ -54,15 +53,15 @@ ported to and tested on the following platforms:
     (FreeBSD Ports Collection)
   - OpenIndiana Hipster 2016.10 with GCC version 4.9.4
 
-The testing on the above listed platforms has been done at some point
-in time with some version of source. Continuous testing is done only
-on Linux platform offered by [Travis CI][11] service.
+Testing on the above-listed platforms was done at some point in time
+with some version of the source. Continuous testing is performed only
+on the Linux platform offered by the [Travis CI][11] service.
 
 The oldest Windows version that is supported by 2.x releases is Windows Vista.
 
 The following platforms were supported by the 1.x series of [log4cplus]. They
-either do not have a reasonable C++11 capable compiler or have not been checked
-with [log4cplus] 2.x, yet:
+either do not have a reasonably C++23-capable compiler or have not yet been
+checked with [log4cplus] 3.x:
 
   - Minix 3.3.0/i386 with Clang version 3.4 (branches/release_34) with
     `--disable-threads`
@@ -77,11 +76,11 @@ with [log4cplus] 2.x, yet:
   - AIX 5.3 with IBM XL C/C++ for AIX
 
 
-Installation instruction
-========================
+Installation instructions
+=========================
 
-Generic Autotools installation instructions are in `INSTALL` file.  The
-following are [log4cplus] specific instructions.
+Generic Autotools installation instructions are in the `INSTALL` file. The
+following are [log4cplus]-specific instructions.
 
 [log4cplus] uses Git sub-modules. Always use `--recurse-submodules` option when
 doing `git clone`.
@@ -148,8 +147,38 @@ compiler and linker flags that enable POSIX threading support.
 
 While this detection usually works well, some platforms still need
 help with configuration by supplying additional flags to the
-`configure` script.  One of the know deficiencies is Solaris Studio on
-Linux.  See one of the later note for details.
+`configure` script. One of the known deficiencies is Solaris Studio on
+Linux. See one of the later notes for details.
+
+
+`--enable-tests`
+----------------
+
+This option is enabled by default.  It enables compilation of test executables.
+
+
+`--enable-unit-tests`
+---------------------
+
+This option is disabled by default. It enables compilation of unit tests along
+with their units. These unit tests can then be executed through the
+`unit_tests` test executable that is built during compilation.
+
+
+`--enable-implicit-initialization`
+----------------------------------
+
+This option is enabled by default.  It enables implicit initialization of
+[log4cplus]. When it is turned off, [log4cplus] has to be explicitly
+initialized by calling either `log4cplus::initialize()` or by instantiating
+`log4cplus::Initializer`.
+
+
+`--enable-lto`
+--------------
+
+This option is disabled by default.  It enables LTO (Link-Time Optimization)
+builds.
 
 
 `--with-wchar_t-support`
@@ -166,7 +195,7 @@ flag. In effect, these binaries assume that `log4cplus::tchar` is `wchar_t`.
 This is one of three locale and `wchar_t`↔`char` conversion related
 options.  It is disabled by default.
 
-It is know to work well with GCC on Linux.  Other platforms generally
+It is known to work well with GCC on Linux. Other platforms generally
 have lesser locale support in their implementations of the C++
 standard library.  It is known not to work well on any BSDs.
 
@@ -176,7 +205,7 @@ See also docs/unicode.txt.
 `--with-working-c-locale`
 -------------------------
 
-This is second of `wchar_t`↔`char` conversion related options.  It is
+This is the second of the `wchar_t`↔`char` conversion-related options. It is
 disabled by default.
 
 It is known to work well on most Unix--like platforms, including
@@ -186,7 +215,7 @@ recent Cygwin.
 `--with-iconv`
 --------------
 
-This is third of `wchar_t`↔`char` conversion related options.  It is
+This is the third of the `wchar_t`↔`char` conversion-related options. It is
 disabled by default.
 
 The conversion using iconv() function always uses `"UTF-8"` and
@@ -194,8 +223,8 @@ The conversion using iconv() function always uses `"UTF-8"` and
 platforms with GNU iconv.  Different implementations of `iconv()`
 might not support `"WCHAR_T"` encoding selector.
 
-Either system provided `iconv()` or library provided `libiconv()` are
-detected and accepted.  Also both SUSv3 and GNU `iconv()` function
+Either the system-provided `iconv()` or the library-provided `libiconv()` is
+detected and accepted. Both SUSv3 and GNU `iconv()` function
 signatures are accepted.
 
 
@@ -207,18 +236,12 @@ separate shared library (liblog4cplusqt4debugappender) that implements
 `Qt4DebugAppender`.  It requires Qt4 and pkg-config to be installed.
 
 
-`--enable-tests`
----------------------
+`--with-qt5`
+------------
 
-This option is enabled by default.  It enables compilation of test executables.
-
-
-`--enable-unit-tests`
----------------------
-
-This option is disabled by default.  It enables compilation of unit tests along
-their units.  These unit tests then can be executed through `unit_tests` test
-executable that is built during compilation.
+This option is disabled by default.  It enables compilation of a separate
+shared library (liblog4cplusqt5debugappender) that implements
+`Qt5DebugAppender`.  It requires Qt5 and pkg-config to be available.
 
 
 Notes
@@ -227,16 +250,16 @@ Notes
 Compilation
 -----------
 
-On Unix--like platforms, [log4cplus] can be compiled using either
-autotools based build system or using CMake build system. The
-autotools based build system is considered to be primary for
+On Unix--like platforms, [log4cplus] can be compiled using either the
+Autotools-based build system or the CMake build system. The
+Autotools-based build system is considered to be primary for
 Unix--like platforms.
 
 On Windows, the primary build system is Visual Studio 2015 solution
 and projects (`msvc14/log4cplus.sln`).
 
-MinGW is supported by autotools based build system. CMake build system
-is supported as well and it should be used to compile [log4cplus] with
+MinGW is supported by the Autotools-based build system. The CMake build system
+is supported as well, and it should be used to compile [log4cplus] with
 older versions of Visual Studio or with less common compiler suites
 (e.g., Embarcadero, Code::Blocks, etc.).
 
@@ -244,9 +267,9 @@ older versions of Visual Studio or with less common compiler suites
 Cygwin
 ------
 
-Cygwin 2.5.x has a problem[^pr64697] linking binaries that use language level
+Cygwin 2.5.x has a problem[^pr64697] linking binaries that use language-level
 thread-local storage and share thread-local variables across translation
-units. To avoid the issue language level thread-local storage is not used on
+units. To avoid the issue, language-level thread-local storage is not used on
 Cygwin and traditional POSIX thread-local storage is used instead.
 
 [^pr64697]: <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64697>
@@ -256,11 +279,11 @@ MinGW and MSVCRT version
 ------------------------
 
 [log4cplus] can use functions like `_vsnprintf_s()` (Microsoft's
-secure version of `vsnprintf()`). MinGW tool--chains (by default) link
+secure version of `vsnprintf()`). MinGW toolchains (by default) link
 to the system `MSVCRT.DLL`. Unfortunately, older systems, like Windows
 XP, ship with `MSVCRT.DLL` that lacks these functions. It is possible
-to compile [log4cplus] with MinGW tool--chains but _without_ using
-Microsoft's secure functions by defining `__MSVCRT_VERSION__` to value
+to compile [log4cplus] with MinGW toolchains but _without_ using
+Microsoft's secure functions by defining `__MSVCRT_VERSION__` to a value
 less than `0x900` and vice versa.
 
     $ ../configure CPPFLAGS="-D__MSVCRT_VERSION__=0x700"
@@ -296,11 +319,11 @@ instances are destroyed.
 Windows and rolling file Appenders
 ----------------------------------
 
-On Windows, the standard C++ file streams open files in way that underlying
-Win32 file `HANDLE` is not open with `FILE_SHARE_DELETE` flag. This flag,
-beside shared delete, allows renaming files that have handles open to
-them. This issue manifests as error code 13 when the file needs to be rolled
-over and it is still open by another process.
+On Windows, the standard C++ file streams open files in a way that the
+underlying Win32 file `HANDLE` is not opened with the `FILE_SHARE_DELETE`
+flag. This flag, besides shared delete, allows renaming files that have
+handles open to them. This issue manifests as error code 13 when the file
+needs to be rolled over while it is still open by another process.
 
 This is also [bug #167](https://sourceforge.net/p/log4cplus/bugs/167/) on
 SourceForge.
@@ -327,13 +350,13 @@ To allow using the best available method, [log4cplus] enables the
 method (2) by checking `_WIN32_WINNT >= 0x0600` condition, when
 compiling [log4cplus] targeted to Windows Vista or later.
 
-[tlsvista]: http://support.microsoft.com/kb/118816/en-us
+[tlsvista]: https://learn.microsoft.com/en-us/cpp/parallel/thread-local-storage-tls?view=msvc-170
 
 
 Linking on Windows
 ------------------
 
-If you are linking your application with DLL variant of [log4cplus], define
+If you are linking your application with the DLL variant of [log4cplus], define
 `LOG4CPLUS_BUILD_DLL` preprocessor symbol. This changes definition of
 `LOG4CPLUS_EXPORT` symbol to `__declspec(dllimport)`.
 
@@ -376,13 +399,13 @@ variants that support threading using the `CXX` variable on
 
     $ ../configure --enable-threads CXX=xlC_r
 
-[1]: http://www.ibm.com/support/knowledgecenter/en/SSGH3R_12.1.0/com.ibm.xlcpp121.aix.doc/compiler_ref/tucmpinv.html
+[1]: https://www.ibm.com/docs/en/xl-c-and-cpp-aix/13.1.0?topic=applications-invoking-compiler
 
 
 AIX reentrancy problem
 ----------------------
 
-There appears to be a reentracy problem with AIX 5.3 and xlC 8 which
+There appears to be a reentrancy problem with AIX 5.3 and xlC 8 which
 can result into a deadlock condition in some circumstances.  It is
 unknown whether the problem manifests with other versions of either
 the OS or the compiler, too.  The problem was initially reported in a
@@ -396,7 +419,7 @@ derived from `std::streambuf` class.  [log4cplus] itself uses
 `std::ostringstream`.  This resulted into an attempt to recursively
 lock the global non recursive lock and a deadlock.
 
-[2]: http://sourceforge.net/p/log4cplus/bugs/103/
+[2]: https://sourceforge.net/p/log4cplus/bugs/103/
 
 
 Solaris / SunOS
@@ -406,7 +429,7 @@ Some older version of this operating system might have problems
 linking [log4cplus] due to [missing `__tls_get_addr`][3] in their
 unpatched state.
 
-[3]: https://groups.google.com/d/msg/comp.unix.solaris/AAMqkK0QZ6U/zlkVKA1L_QcJ
+[3]: https://groups.google.com/g/comp.unix.solaris/c/AAMqkK0QZ6U/m/zlkVKA1L_QcJ
 
 
 Solaris Studio
@@ -432,11 +455,11 @@ your application's build flags as well.
 Solaris Studio on GNU/Linux
 ---------------------------
 
-The autotools and our `configure.ac` combo does not handle Solaris
-Studio compiler on Linux well enough and needs a little help with
+The Autotools and our `configure.ac` combination do not handle the Solaris
+Studio compiler on Linux well enough and need a little help with the
 configuration of POSIX threads:
 
-~~~~{.bash}
+```sh
 $ COMMON_FLAGS="-L/lib/x86_64-linux-gnu/ \
 -L/usr/lib/x86_64-linux-gnu/ -mt=yes -O"
 
@@ -446,7 +469,7 @@ CXX=/opt/solarisstudio12.3/bin/CC \
 CFLAGS="$COMMON_FLAGS" \
 CXXFLAGS="$COMMON_FLAGS" \
 LDFLAGS="-lpthread"
-~~~~
+```
 
 
 HP-UX with `aCC`
@@ -475,7 +498,7 @@ line:
     $ ../configure --disable-symbols-visibility-options \
     --enable-threads=yes CXXFLAGS="-AA"
 
-[9]: http://h30499.www3.hp.com/t5/Languages-and-Scripting/Building-Log4cplus-fails-with-quot-ld-Unsatisfied-symbol-virtual/td-p/6261411#.UoHtgPmet8G
+[9]: https://community.hpe.com/t5/languages-and-scripting/building-log4cplus-fails-with-quot-ld-unsatisfied-symbol-virtual/m-p/6262849#.Y_5ho4DMImM
 
 
 Haiku
@@ -483,33 +506,33 @@ Haiku
 
 Haiku is supported with GCC 4+. The default GCC version in Haiku is
 set to version 2 (based on GCC 2.95.x). To change the default GCC
-version to version 4, please run `setgcc gcc4` command. This is to
+version to 4, please run the `setgcc gcc4` command. This is to
 avoid linking errors like this:
 
     main.cpp:(.text.startup+0x54a): undefined reference to `_Unwind_Resume'
 
 Running the command switches the _current_ GCC version to version 4.
-This change is permanent and global. See also Haiku ticket
-[#8368](http://dev.haiku-os.org/ticket/8368).
+This change is permanent and global. See also the Haiku ticket
+[#8368](https://dev.haiku-os.org/ticket/8368).
 
 
 Qt4 / Win32 / MSVC
 ------------------
 
-In order to use [log4cplus] in Qt4 programs it is necessary to set
-following option: `Treat WChar_t As Built in Type: No (/Zc:wchar_t-)`
+In order to use [log4cplus] in Qt4 programs it is necessary to set the
+following option: `Treat WChar_t As Built-in Type: No (/Zc:wchar_t-)`
 
-Set this option for [log4cplus] project and `Qt4DebugAppender` project
-in MS Visual Studio.  Remember to use Unicode versions of [log4cplus]
-libraries with Qt.  It is also necessary to make clear distinction
-between debug and release builds of Qt project and [log4cplus].  Do
-not use [log4cplus] release library with debug version of Qt program
-and vice versa.
+Set this option for the [log4cplus] project and the `Qt4DebugAppender`
+project in MS Visual Studio. Remember to use the Unicode versions of
+[log4cplus] libraries with Qt. It is also necessary to make a clear
+distinction between debug and release builds of the Qt project and
+[log4cplus]. Do not use the [log4cplus] release library with the debug
+version of a Qt program and vice versa.
 
-For registering Qt4DebugAppender library at runtime, call this
+To register the Qt4DebugAppender library at runtime, call this
 function: `log4cplus::Qt4DebugAppender::registerAppender()`
 
-Add these lines to qmake project file for using [log4cplus] and
+Add these lines to the qmake project file to use [log4cplus] and
 `Qt4DebugAppender`:
 
     INCLUDEPATH += C:\log4cplus\include
@@ -575,7 +598,7 @@ Edit the `iOS.cmake` file and add these two lines.
     set (CMAKE_CXX_COMPILER_WORKS TRUE)
     set (CMAKE_C_COMPILER_WORKS TRUE)
 
-Add these lines. Customize them accordingly:
+Add these lines, customizing them accordingly:
 
     set(MACOSX_BUNDLE_GUI_IDENTIFIER com.example)
     set(CMAKE_MACOSX_BUNDLE YES)
@@ -595,25 +618,25 @@ If you have issues with TLS, also comment out these lines:
 
 Beware, the `%s` specifier does not work the same way on Unix--like
 platforms as it does on Windows with Visual Studio. With Visual Studio
-the `%s` specifier changes its meaning conveniently by printing
-`wchar_t` string when used with `wprintf()` and `char` strings when
-used with `printf()`.  On the other hand, Unix--like platforms keeps
-the meaning of printing `char` strings when used with both `wprintf()`
-and `printf()`.  It is necessary to use `%ls` (C99) specifier or `%S`
-(SUSv2) specifier to print `wchar_t` strings on Unix--like platforms.
+the `%s` specifier changes its meaning by printing a `wchar_t` string
+when used with `wprintf()` and a `char` string when used with
+`printf()`. On the other hand, Unix-like platforms keep the meaning of
+printing `char` strings when used with both `wprintf()` and
+`printf()`. It is necessary to use the `%ls` (C99) specifier or the `%S`
+(SUSv2) specifier to print `wchar_t` strings on Unix-like platforms.
 
-The common ground for both platforms appears to be use of `%ls` and
-`wchar_t` string to print strings with unmodified formatting string
-argument on both Unix--like platforms and Windows. The conversion of
-`wchar_t` back to `char` then depends on C locale.
+The common ground for both platforms appears to be using `%ls` and a
+`wchar_t` string to print strings with an unmodified format string on
+both Unix-like platforms and Windows. The conversion of `wchar_t` back
+to `char` then depends on the C locale.
 
 
 Unsupported compilers and platforms
 -----------------------------------
 
 [log4cplus] does not support too old or broken C++ compilers. Since [log4cplus]
-version 2.0.0, it means it does not support any platform or compiler without
-decent C++11 support.
+version 3.0.0, it means it does not support any platform or compiler without
+decent C++23 support.
 
   - Visual Studio prior to 2015
   - GCC prior to 4.8
@@ -656,45 +679,35 @@ For successful resolution of reported bugs, it is necessary to provide enough in
 License
 =======
 
-This library is licensed under the Apache Public License 2.0 and two
-clause BSD license.  Please read the included LICENSE file for
+This library is licensed under the Apache Public License 2.0 and the
+two-clause BSD license. Please read the included [LICENSE](./LICENSE) file for
 details.
 
 
 Contributions
 =============
 
-[log4cplus] (bug tracker, files, wiki) is hosted on SourceForge,
-except for [log4cplus source][5], which is hosted on GitHub. This
-allows the project to integrate with [Travis CI][11] service offered
-by GitHub.
-
-[5]: https://sourceforge.net/p/log4cplus/source-code-link/
-[11]: https://sourceforge.net/p/log4cplus/travis-ci/
+[log4cplus] (bug tracker, files, wiki) is hosted on GitHub. See also the
+[Contributions](https://github.com/log4cplus/log4cplus/wiki/Development#contributions)
+topic on the wiki.
 
 
 Patches
 -------
 
-Anybody can contribute to log4cplus development. If you are
-contributing a source code change, use a reasonable form: a merge
-request of a Git branch or a patch file attached to a ticket in
-[Bugs tracker][6] or sent to [log4cplus-devel mailing list][7]. Unless
-it is obvious, always state what branch or release tarball is your
-patch based upon.
-
-[6]: https://sourceforge.net/p/log4cplus/bugs/
-[7]: mailto:log4cplus-devel@lists.sourceforge.net
+Anybody can contribute to log4cplus development.
+If you are contributing a source code change, use a reasonable
+form: a merge request of a Git branch.
 
 
 Formatting
 ----------
 
-Please use common sense. Follow the style of surrounding code. You can
-use the following Emacs style that is based on Microsoft's style as a
-guide line:
+Please use common sense. Follow the style of the surrounding code. You can
+use the following Emacs style, which is based on Microsoft's style, as a
+guideline:
 
-~~~~{.commonlisp}
+```lisp
 ;; Custom MS like indentation style.
 (c-add-style "microsoft"
              '("stroustrup"
@@ -704,7 +717,7 @@ guide line:
                 (inher-cont . c-lineup-multi-inher)
                 (arglist-cont-nonempty . +)
                 (template-args-cont . +))))
-~~~~
+```
 
 
 Tools
@@ -719,27 +732,27 @@ Autotools is considered the primary build system on Unix--like
 platforms. However, CMake should still be usable on Unix--like platforms as
 well.
 
-On Windows, it depends on compiler and tool-chain that you want to use. When
+On Windows, it depends on the compiler and toolchain that you want to use. When
 using Visual Studio, use Visual Studio solution and project files. However,
-CMake build system should still work and produce useful results. When using
-some form of MinGW64 tool-chain, the CMake build system is considered primary
-and the Autotools based build system is unsupported. Use the `MinGW Makefiles`
+the CMake build system should still work and produce useful results. When using
+some form of MinGW64 toolchain, the CMake build system is considered primary
+and the Autotools-based build system is unsupported. Use the `MinGW Makefiles`
 option and build with `mingw-make` (or similar). The `MSYS Makefiles` option is
 untested and unsupported.
 
 #### Autotools
 
-The `Makefile.am` files for this build systems are hand written. Some of them,
+The `Makefile.am` files for this build system are hand-written. Some of them,
 however, are generated from `Makefile.am.tpl` and `Makefile.am.def` by
 [GNU Autogen][12]. This is to make adding new files to the source easier.
 
 To regenerate `Makefile.am` files, `configure` script, `testsuite` script or
 any other part of the Autotools build system, use the `scripts/doautoreconf.sh`
-script from source root directory. It will invoke all the necessary tools in
+script from the source root directory. It will invoke all the necessary tools in
 the correct order.
 
 [log4cplus] closely follows Autoconf's, Automake's and Libtool's development
 and its master branch files are always generated using the latest available
 version of the tools.
 
-[12]: http://www.gnu.org/software/autogen/
+[12]: https://www.gnu.org/software/autogen/

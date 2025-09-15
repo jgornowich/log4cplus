@@ -25,7 +25,7 @@
 #include <cassert>
 
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,7 +50,7 @@ SharedObject::addReference() const LOG4CPLUS_NOEXCEPT
     ++count__;
 
 #else
-    std::atomic_fetch_add_explicit (&count__, 1u,
+    std::atomic_fetch_add_explicit (&count__, 1U,
         std::memory_order_relaxed);
 
 #endif
@@ -67,15 +67,15 @@ SharedObject::removeReference() const
     destroy = --count__ == 0;
 
 #else
-    destroy = std::atomic_fetch_sub_explicit (&count__, 1u,
+    destroy = std::atomic_fetch_sub_explicit (&count__, 1U,
         std::memory_order_release) == 1;
-    if (LOG4CPLUS_UNLIKELY (destroy))
+    if (destroy) [[unlikely]]
         std::atomic_thread_fence (std::memory_order_acquire);
 
 #endif
-    if (LOG4CPLUS_UNLIKELY (destroy))
+    if (destroy) [[unlikely]]
         delete this;
 }
 
 
-} } // namespace log4cplus { namespace helpers
+} // namespace log4cplus::helpers

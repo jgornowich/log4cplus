@@ -53,6 +53,7 @@
 #include <cerrno>
 #include <limits>
 #include <cstring>
+#include <utility>
 
 #include <log4cplus/helpers/lockfile.h>
 #include <log4cplus/helpers/stringhelper.h>
@@ -81,7 +82,7 @@
 #error "no usable file locking"
 #endif
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 
 #if defined (_WIN32)
@@ -103,9 +104,11 @@ HANDLE
 get_os_HANDLE (int fd)
 {
     HANDLE fh = reinterpret_cast<HANDLE>(_get_osfhandle (fd));
-    if (fh == INVALID_HANDLE_VALUE)
+    if (fh == INVALID_HANDLE_VALUE) {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT ("_get_osfhandle() failed: "))
             + convertIntegerToString (errno), true);
+        std::unreachable ();
+    }
 
     return fh;
 }
@@ -225,16 +228,22 @@ LockFile::open (int open_flags) const
 #  else
 #    error "Neither _tsopen_s() nor _tsopen() is available."
 #  endif
+    {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT("could not open or create file "))
             + lock_file_name, true);
+        std::unreachable ();
+    }
 
 #elif defined (LOG4CPLUS_USE_POSIX_LOCKING)
     data->fd = ::open (LOG4CPLUS_TSTRING_TO_STRING (lock_file_name).c_str (),
         open_flags, OPEN_MODE);
     if (data->fd == -1)
+    {
         getLogLog ().error (
             tstring (LOG4CPLUS_TEXT ("could not open or create file "))
             + lock_file_name, true);
+        std::unreachable ();
+    }
 
 #if ! defined (O_CLOEXEC)
     if (! trySetCloseOnExec (data->fd))
@@ -284,9 +293,11 @@ LockFile::lock () const
     ret = LockFileEx(fh, LOCKFILE_EXCLUSIVE_LOCK, 0,
         (std::numeric_limits<DWORD>::max) (),
         (std::numeric_limits<DWORD>::max) (), &overlapped);
-    if (! ret)
+    if (! ret) {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT ("LockFileEx() failed: "))
             + convertIntegerToString (GetLastError ()), true);
+        std::unreachable ();
+    }
 
 #elif defined (LOG4CPLUS_USE_O_EXLOCK)
     open (OPEN_FLAGS | O_EXLOCK);
@@ -301,8 +312,11 @@ LockFile::lock () const
         fl.l_len = 0;
         ret = fcntl (data->fd, F_SETLKW, &fl);
         if (ret == -1 && errno != EINTR)
+        {
             getLogLog ().error (tstring (LOG4CPLUS_TEXT("fcntl(F_SETLKW) failed: "))
                 + convertIntegerToString (errno), true);
+            std::unreachable ();
+        }
     }
     while (ret == -1);
 
@@ -310,9 +324,11 @@ LockFile::lock () const
     do
     {
         ret = lockf (data->fd, F_LOCK, 0);
-        if (ret == -1 && errno != EINTR)
+        if (ret == -1 && errno != EINTR) {
             getLogLog ().error (tstring (LOG4CPLUS_TEXT("lockf() failed: "))
                 + convertIntegerToString (errno), true);
+            std::unreachable ();
+        }
     }
     while (ret == -1);
 
@@ -320,9 +336,11 @@ LockFile::lock () const
     do
     {
         ret = flock (data->fd, LOCK_EX);
-        if (ret == -1 && errno != EINTR)
+        if (ret == -1 && errno != EINTR) {
             getLogLog ().error (tstring (LOG4CPLUS_TEXT("flock() failed: "))
                 + convertIntegerToString (errno), true);
+            std::unreachable ();
+        }
     }
     while (ret == -1);
 
@@ -339,9 +357,11 @@ void LockFile::unlock () const
 
     ret = UnlockFile(fh, 0, 0, (std::numeric_limits<DWORD>::max) (),
         (std::numeric_limits<DWORD>::max) ());
-    if (! ret)
+    if (! ret) {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT ("UnlockFile() failed: "))
             + convertIntegerToString (GetLastError ()), true);
+        std::unreachable ();
+    }
 
 #elif defined (LOG4CPLUS_USE_O_EXLOCK)
     close ();
@@ -354,25 +374,32 @@ void LockFile::unlock () const
     fl.l_len = 0;
     ret = fcntl (data->fd, F_SETLKW, &fl);
     if (ret != 0)
+    {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT("fcntl(F_SETLKW) failed: "))
             + convertIntegerToString (errno), true);
+        std::unreachable ();
+    }
 
 #elif defined (LOG4CPLUS_USE_LOCKF)
     ret = lockf (data->fd, F_ULOCK, 0);
-    if (ret != 0)
+    if (ret != 0) {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT("lockf() failed: "))
             + convertIntegerToString (errno), true);
+        std::unreachable ();
+    }
+
 
 #elif defined (LOG4CPLUS_USE_FLOCK)
     ret = flock (data->fd, LOCK_UN);
-    if (ret != 0)
+    if (ret != 0) {
         getLogLog ().error (tstring (LOG4CPLUS_TEXT("flock() failed: "))
             + convertIntegerToString (errno), true);
+        std::unreachable ();
+    }
 
 #endif
-
 }
 
 
 
-} } // namespace log4cplus { namespace helpers {
+} // namespace log4cplus::helpers

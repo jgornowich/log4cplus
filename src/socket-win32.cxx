@@ -132,7 +132,7 @@ init_winsock ()
 {
     // Quick check first to avoid the expensive interlocked compare
     // and exchange.
-    if (LOG4CPLUS_LIKELY (winsock_state == WS_INITIALIZED))
+    if (winsock_state == WS_INITIALIZED) [[likely]]
         return;
     else
         init_winsock_worker ();
@@ -211,7 +211,7 @@ openSocket(tstring const & host, unsigned short port, bool udp, bool ipv6,
     if (::listen(sock_holder.sock, 10) != 0)
         goto error;
 
-    state = ok;
+    state = SocketState::ok;
     return to_log4cplus_socket (sock_holder.detach());
 
 error:
@@ -281,7 +281,7 @@ connectSocket(const tstring& hostn, unsigned short port, bool udp, bool ipv6,
         return INVALID_SOCKET_VALUE;
     }
 
-    state = ok;
+    state = SocketState::ok;
     return to_log4cplus_socket (sock_holder.detach());
 }
 
@@ -294,7 +294,7 @@ acceptSocket(SOCKET_TYPE sock, SocketState & state)
     SOCKET connected_socket = ::accept (to_os_socket (sock), nullptr, nullptr);
 
     if (connected_socket != INVALID_OS_SOCKET_VALUE)
-        state = ok;
+        state = SocketState::ok;
     else
         set_last_socket_error (WSAGetLastError ());
 
@@ -323,11 +323,13 @@ read(SOCKET_TYPE sock, SocketBuffer& buffer)
     long read = 0;
     os_socket_type const osSocket = to_os_socket (sock);
 
+    char * const buf = buffer.getBuffer ();
+    std::size_t const buf_max_size = buffer.getMaxSize ();
     do
     {
         long const res = ::recv(osSocket,
-            buffer.getBuffer() + read,
-            static_cast<int>(buffer.getMaxSize() - read),
+            buf + read,
+            static_cast<int>(buf_max_size - read),
             0);
         if (res == SOCKET_ERROR)
         {
@@ -342,7 +344,7 @@ read(SOCKET_TYPE sock, SocketBuffer& buffer)
 
         read += res;
     }
-    while (read < static_cast<long>(buffer.getMaxSize()));
+    while (read < static_cast<long>(buf_max_size));
 
     return read;
 }
@@ -419,12 +421,12 @@ verifyWindowsVersionAtLeast (DWORD major, DWORD minor)
 }
 
 
-tstring
+std::optional<tstring>
 getHostname (bool fqdn)
 {
     init_winsock ();
 
-    char const * hostname = "unknown";
+    char const * hostname = nullptr;
     int ret;
     // The initial size is based on information in the Microsoft article
     // <https://msdn.microsoft.com/en-us/library/ms738527(v=vs.85).aspx>
@@ -449,13 +451,13 @@ getHostname (bool fqdn)
                 helpers::getLogLog().error(
                     LOG4CPLUS_TEXT("Failed to get own hostname. Error: ")
                     + convertIntegerToString (wsaeno));
-                return LOG4CPLUS_STRING_TO_TSTRING (hostname);
+                return { };
             }
         }
     }
 
-    if (ret != 0 || (ret == 0 && ! fqdn))
-        return LOG4CPLUS_STRING_TO_TSTRING (hostname);
+    if (! fqdn)
+        return { LOG4CPLUS_C_STR_TO_TSTRING (hostname) };
 
     ADDRINFOT addr_info_hints{ };
     addr_info_hints.ai_family = AF_INET;
@@ -477,11 +479,11 @@ getHostname (bool fqdn)
         helpers::getLogLog ().error (
             LOG4CPLUS_TEXT ("Failed to resolve own hostname. Error: ")
             + convertIntegerToString (ret));
-        return LOG4CPLUS_STRING_TO_TSTRING (hostname);
+        return { LOG4CPLUS_C_STR_TO_TSTRING (hostname) };
     }
 
     addr_info.reset (ai);
-    return addr_info->ai_canonname;
+    return { addr_info->ai_canonname };
 }
 
 
@@ -635,7 +637,8 @@ ServerSocket::accept ()
 
             // Return Socket with state set to accept_interrupted.
 
-            return Socket (INVALID_SOCKET_VALUE, accept_interrupted, 0);
+            return Socket (INVALID_SOCKET_VALUE,
+                SocketState::accept_interrupted, 0);
         }
 
         // This is accept_ev.
@@ -647,7 +650,7 @@ ServerSocket::accept ()
 
             // Finally, call accept().
 
-            SocketState st = not_opened;
+            SocketState st = SocketState::not_opened;
             SOCKET_TYPE clientSock = acceptSocket (sock, st);
             int eno = 0;
             if (clientSock == INVALID_SOCKET_VALUE)
@@ -680,7 +683,7 @@ error:;
         WSACloseEvent (accept_ev);
 
     set_last_socket_error (eno);
-    return Socket (INVALID_SOCKET_VALUE, not_opened, eno);
+    return Socket (INVALID_SOCKET_VALUE, SocketState::not_opened, eno);
 }
 
 

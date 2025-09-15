@@ -31,20 +31,15 @@
 #include <cassert>
 
 #if defined (LOG4CPLUS_WITH_UNIT_TESTS)
-#include <catch.hpp>
+#include <catch_amalgamated.hpp>
 #include <limits>
 #endif
 
 
-namespace log4cplus
-{
-
-namespace internal
+namespace log4cplus::internal
 {
 
 log4cplus::tstring const empty_str;
-
-} // namespace internal
 
 } // namespace log4cplus
 
@@ -64,10 +59,7 @@ operator <<(log4cplus::tostream& stream, const char* str)
 #endif
 
 
-namespace log4cplus
-{
-
-namespace helpers
+namespace log4cplus::helpers
 {
 
 
@@ -253,7 +245,7 @@ toLower(const tstring_view& s)
 namespace
 {
 
-template <typename IntType>
+template <std::integral IntType>
 struct test
 {
     using limits = std::numeric_limits<IntType>;
@@ -522,7 +514,5 @@ CATCH_TEST_CASE( "Strings helpers", "[strings]" )
 #endif
 
 
-
-} // namespace helpers
 
 } // namespace log4cplus

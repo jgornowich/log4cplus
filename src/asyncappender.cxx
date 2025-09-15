@@ -24,6 +24,8 @@
 #include <log4cplus/config.hxx>
 #ifndef LOG4CPLUS_SINGLE_THREADED
 
+#include <utility>
+
 #include <log4cplus/asyncappender.h>
 #include <log4cplus/spi/factory.h>
 #include <log4cplus/helpers/loglog.h>
@@ -45,7 +47,7 @@ class QueueThread
 public:
     QueueThread (AsyncAppenderPtr, thread::QueuePtr);
 
-    void run() override;
+    virtual void run() override;
 
 private:
     AsyncAppenderPtr appenders;
@@ -62,7 +64,7 @@ QueueThread::QueueThread (AsyncAppenderPtr aai, thread::QueuePtr q)
 void
 QueueThread::run()
 {
-    typedef log4cplus::thread::Queue::queue_storage_type ev_buf_type;
+    using ev_buf_type = log4cplus::thread::Queue::queue_storage_type;
     ev_buf_type ev_buf;
 
     while (true)
@@ -70,8 +72,8 @@ QueueThread::run()
         unsigned qflags = queue->get_events (&ev_buf);
         if (qflags & thread::Queue::EVENT)
         {
-            ev_buf_type::const_iterator const ev_buf_end = ev_buf.end ();
-            for (ev_buf_type::const_iterator it = ev_buf.begin ();
+            auto const ev_buf_end = ev_buf.end ();
+            for (auto it = ev_buf.begin ();
                 it != ev_buf_end; ++it)
                 appenders->appendLoopOnAppenders (*it);
         }
@@ -119,6 +121,7 @@ AsyncAppender::AsyncAppender (helpers::Properties const & props)
             LOG4CPLUS_TEXT ("AsyncAppender::AsyncAppender()")
             LOG4CPLUS_TEXT (" - Cannot find AppenderFactory: ")
             + appender_name, true);
+        std::unreachable ();
     }
 
     helpers::Properties appender_props = props.getPropertySubset (

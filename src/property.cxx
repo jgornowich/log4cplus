@@ -34,6 +34,8 @@
 #include <locale>
 #include <fstream>
 #include <sstream>
+#include <iostream>
+#include <filesystem>
 #include <log4cplus/streams.h>
 #include <log4cplus/fstreams.h>
 #include <log4cplus/helpers/stringhelper.h>
@@ -41,13 +43,15 @@
 #include <log4cplus/internal/internal.h>
 #include <log4cplus/internal/env.h>
 #include <log4cplus/helpers/loglog.h>
+#include <log4cplus/exception.h>
+#include <log4cplus/configurator.h>
 
 #if defined (LOG4CPLUS_WITH_UNIT_TESTS)
-#include <catch.hpp>
+#include <catch_amalgamated.hpp>
 #endif
 
 
-namespace log4cplus { namespace helpers {
+namespace log4cplus::helpers {
 
 
 const tchar Properties::PROPERTIES_COMMENT_CHAR = LOG4CPLUS_TEXT('#');
@@ -134,7 +138,7 @@ CATCH_TEST_CASE( "String trimming", "[strings][properties]")
 
 
 void
-imbue_file_from_flags (tistream & file, unsigned flags)
+imbue_file_from_flags ([[maybe_unused]] tistream & file, unsigned flags)
 {
     switch (flags & (Properties::fEncodingMask << Properties::fEncodingShift))
     {
@@ -162,7 +166,7 @@ imbue_file_from_flags (tistream & file, unsigned flags)
                 // TODO: This should actually be a custom "null" facet
                 // that just copies the chars to wchar_t buffer.
                 new std::codecvt<wchar_t, char, std::mbstate_t>));
-    break;
+        break;
 
 #endif
 
@@ -185,6 +189,111 @@ imbue_file_from_flags (tistream & file, unsigned flags)
 
 } // namespace
 
+
+/**
+ * Perform variable substitution in string <code>val</code> from
+ * environment variables.
+ *
+ * <p>The variable substitution delimiters are <b>${</b> and <b>}</b>.
+ *
+ * <p>For example, if the System properties contains "key=value", then
+ * the call
+ * <pre>
+ * string s;
+ * substEnvironVars(s, "Value of key is ${key}.");
+ * </pre>
+ *
+ * will set the variable <code>s</code> to "Value of key is value.".
+ *
+ * <p>If no value could be found for the specified key, then
+ * substitution defaults to the empty string.
+ *
+ * <p>For example, if there is no environment variable "inexistentKey",
+ * then the call
+ *
+ * <pre>
+ * string s;
+ * substEnvironVars(s, "Value of inexistentKey is [${inexistentKey}]");
+ * </pre>
+ * will set <code>s</code> to "Value of inexistentKey is []"
+ *
+ * @param val The string on which variable substitution is performed.
+ * @param dest The result.
+ */
+bool
+substVars (tstring & dest, const tstring & val,
+    helpers::Properties const & props, helpers::LogLog& loglog,
+    unsigned flags)
+{
+    tchar constexpr DELIM_START[] = LOG4CPLUS_TEXT("${");
+    tchar constexpr DELIM_STOP[] = LOG4CPLUS_TEXT("}");
+    std::size_t constexpr DELIM_START_LEN = 2;
+    std::size_t constexpr DELIM_STOP_LEN = 1;
+
+    tstring::size_type i = 0;
+    tstring::size_type var_start, var_end;
+    tstring pattern (val);
+    tstring key;
+    tstring replacement;
+    bool changed = false;
+    bool const empty_vars
+        = !! (flags & PropertyConfigurator::fAllowEmptyVars);
+    bool const shadow_env
+        = !! (flags & PropertyConfigurator::fShadowEnvironment);
+    bool const rec_exp
+        = !! (flags & PropertyConfigurator::fRecursiveExpansion);
+
+    while (true)
+    {
+        // Find opening paren of variable substitution.
+        var_start = pattern.find(DELIM_START, i);
+        if (var_start == tstring::npos)
+        {
+            dest = pattern;
+            return changed;
+        }
+
+        // Find closing paren of variable substitution.
+        var_end = pattern.find(DELIM_STOP, var_start);
+        if (var_end == tstring::npos)
+        {
+            tostringstream buffer;
+            buffer << '"' << pattern
+                    << "\" has no closing brace. "
+                    << "Opening brace at position " << var_start << ".";
+            loglog.error(buffer.str());
+            dest = val;
+            return false;
+        }
+
+        key.assign (pattern, var_start + DELIM_START_LEN,
+            var_end - (var_start + DELIM_START_LEN));
+        replacement.clear ();
+        if (shadow_env)
+            replacement = props.getProperty (key);
+        if (! shadow_env || (! empty_vars && replacement.empty ()))
+            internal::get_env_var (replacement, key);
+
+        if (empty_vars || ! replacement.empty ())
+        {
+            // Substitute the variable with its value in place.
+            pattern.replace (var_start, var_end - var_start + DELIM_STOP_LEN,
+                replacement);
+            changed = true;
+            if (rec_exp)
+                // Retry expansion on the same spot.
+                continue;
+            else
+                // Move beyond the just substituted part.
+                i = var_start + replacement.size ();
+        }
+        else
+            // Nothing has been substituted, just move beyond the
+            // unexpanded variable.
+            i = var_end + DELIM_STOP_LEN;
+    } // end while loop
+
+} // end substVars()
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -215,11 +324,11 @@ Properties::Properties(const tstring& inputFile, unsigned f)
     tifstream file;
     imbue_file_from_flags (file, flags);
 
-    file.open(LOG4CPLUS_FSTREAM_PREFERED_FILE_NAME(inputFile).c_str(),
+    file.open(std::filesystem::path (inputFile),
         std::ios::binary);
     if (! file.good ())
         helpers::getLogLog ().error (LOG4CPLUS_TEXT ("could not open file ")
-            + inputFile);
+            + inputFile, (flags & Properties::fThrow) != 0);
 
     init(file);
 }
@@ -247,41 +356,44 @@ Properties::init(tistream& input)
             // Remove trailing 'Windows' \r.
             buffer.resize (buffLen - 1);
 
-        tstring::size_type const idx = buffer.find(LOG4CPLUS_TEXT ('='));
-        if (idx != tstring::npos)
-        {
-            tstring key = buffer.substr(0, idx);
-            tstring value = buffer.substr(idx + 1);
-            trim_trailing_ws (key);
-            trim_ws (value);
-            setProperty(key, value);
-        }
-        else if (buffer.compare (0, 7, LOG4CPLUS_TEXT ("include")) == 0
-            && buffer.size () >= 7 + 1 + 1
+        if (buffer.size () >= 7 + 1 + 1
+            && buffer.compare (0, 7, LOG4CPLUS_TEXT ("include")) == 0
             && is_space (buffer[7]))
         {
             tstring included (buffer, 8) ;
             trim_ws (included);
 
+            tstring subIncluded;
+            helpers::substVars(subIncluded, included, *this, helpers::getLogLog(), 0);
+
             tifstream file;
             imbue_file_from_flags (file, flags);
 
-            file.open (LOG4CPLUS_FSTREAM_PREFERED_FILE_NAME(included).c_str(),
+            file.open (std::filesystem::path (subIncluded),
                 std::ios::binary);
             if (! file.good ())
                 helpers::getLogLog ().error (
-                    LOG4CPLUS_TEXT ("could not open file ") + included);
+                    LOG4CPLUS_TEXT ("could not open file ") + subIncluded);
 
             init (file);
+        }
+        else
+        {
+            if (auto const idx = buffer.find(LOG4CPLUS_TEXT ('=')); idx != tstring::npos)
+            {
+                tstring key = buffer.substr(0, idx);
+                tstring value = buffer.substr(idx + 1);
+                trim_trailing_ws (key);
+                trim_ws (value);
+                setProperty(key, value);
+            }
         }
     }
 }
 
 
 
-Properties::~Properties()
-{
-}
+Properties::~Properties() = default;
 
 
 
@@ -321,8 +433,7 @@ Properties::getProperty(tchar const * key) const
 tstring
 Properties::getProperty(const tstring& key, const tstring& defaultVal) const
 {
-    StringMap::const_iterator it (data.find (key));
-    if (it == data.end ())
+    if (auto it {data.find (key)}; it == data.end ())
         return defaultVal;
     else
         return it->second;
@@ -417,7 +528,7 @@ bool
 Properties::getString (log4cplus::tstring & val, log4cplus::tstring const & key)
     const
 {
-    StringMap::const_iterator it (data.find (key));
+    auto it (data.find (key));
     if (it == data.end ())
         return false;
 
@@ -430,8 +541,7 @@ template <typename StringType>
 log4cplus::tstring const &
 Properties::get_property_worker (StringType const & key) const
 {
-    StringMap::const_iterator it (data.find (key));
-    if (it == data.end ())
+    if (auto it {data.find (key)}; it == data.end ())
         return log4cplus::internal::empty_str;
     else
         return it->second;
@@ -451,11 +561,9 @@ Properties::get_type_val_worker (ValType & val, log4cplus::tstring const & key)
     ValType tmp_val;
     tchar ch;
 
-    iss >> tmp_val;
-    if (! iss)
+    if (iss >> tmp_val; ! iss)
         return false;
-    iss >> ch;
-    if (iss)
+    if (iss >> ch; iss)
         return false;
 
     val = tmp_val;
@@ -534,8 +642,16 @@ CATCH_TEST_CASE ("Properties", "[properties]")
         CATCH_REQUIRE (std::find (std::begin (names), std::end (names),
                 PROP_SECOND) != std::end (names));
     }
+
+    CATCH_SECTION ("throw on nonexistent file")
+    {
+        auto && f = [] {
+            Properties props2 (LOG4CPLUS_TEXT ("xxx does not exist"), Properties::fThrow);
+        };
+        CATCH_REQUIRE_THROWS_AS (f (), log4cplus::exception);
+    }
 }
 #endif
 
 
-} } // namespace log4cplus { namespace helpers {
+} // namespace log4cplus::helpers
